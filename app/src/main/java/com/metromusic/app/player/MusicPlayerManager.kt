@@ -83,6 +83,13 @@ class MusicPlayerManager @Inject constructor(
             }
         }
 
+        val localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
+        val artworkUri = if (localArtworkFile != null) {
+            android.net.Uri.fromFile(localArtworkFile)
+        } else {
+            song.highQualityImageUrl?.let { android.net.Uri.parse(it) }
+        }
+
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
@@ -90,7 +97,7 @@ class MusicPlayerManager @Inject constructor(
                     .setTitle(song.name)
                     .setArtist(song.primaryArtistNames)
                     .setAlbumTitle(song.album.name)
-                    .setArtworkUri(song.highQualityImageUrl?.let { android.net.Uri.parse(it) })
+                    .setArtworkUri(artworkUri)
                     .build()
             )
             .build()

@@ -46,7 +46,11 @@ class LibraryViewModel @Inject constructor(
                 artists = com.metromusic.app.data.model.SongArtists(
                     primary = listOf(com.metromusic.app.data.model.ArtistMap(name = ds.artist))
                 ),
-                image = emptyList(),
+                image = if (!ds.imageUrl.isNullOrEmpty()) {
+                    listOf(com.metromusic.app.data.model.DownloadLink(quality = "500x500", url = ds.imageUrl))
+                } else {
+                    emptyList()
+                },
                 downloadUrl = emptyList() // It's already local
             )
         }

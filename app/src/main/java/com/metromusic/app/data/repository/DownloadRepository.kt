@@ -50,17 +50,50 @@ class DownloadRepository @Inject constructor(
         }
 
         val songs = dir.listFiles()?.filter { it.extension.equals("mp3", ignoreCase = true) }?.map { file ->
-            val parts = file.nameWithoutExtension.split(" - ", limit = 2)
-            val name = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
-            val artist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
+            val retriever = android.media.MediaMetadataRetriever()
+            var name = file.nameWithoutExtension
+            var artist = "Unknown Artist"
+            var album: String? = null
+            var duration: Int? = null
+            var imageUrl: String? = null
+
+            try {
+                retriever.setDataSource(file.absolutePath)
+                name = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension
+                artist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+                album = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                duration = durStr?.toIntOrNull()?.let { it / 1000 }
+
+                val artworkBytes = retriever.embeddedPicture
+                if (artworkBytes != null) {
+                    val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
+                    if (!cacheFile.exists() || cacheFile.length() != artworkBytes.size.toLong()) {
+                        cacheFile.writeBytes(artworkBytes)
+                    }
+                    imageUrl = cacheFile.absolutePath
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                val parts = file.nameWithoutExtension.split(" - ", limit = 2)
+                name = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
+                artist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
+            } finally {
+                try {
+                    retriever.release()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             DownloadedSong(
                 id = file.absolutePath.hashCode().toString(),
                 name = name,
                 artist = artist,
-                album = null,
-                duration = null,
+                album = album,
+                duration = duration,
                 filePath = file.absolutePath,
-                imageUrl = null,
+                imageUrl = imageUrl,
                 fileSize = file.length()
             )
         }?.sortedByDescending { it.filePath } ?: emptyList()
@@ -68,10 +101,22 @@ class DownloadRepository @Inject constructor(
         _downloadedSongs.value = songs
     }
 
+    fun getCachedArtworkForSong(song: Song): File? {
+        val file = getFileForSong(song)
+        if (!file.exists()) return null
+        val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
+        return if (cacheFile.exists()) cacheFile else null
+    }
+
     suspend fun deleteSong(song: DownloadedSong): Boolean = withContext(Dispatchers.IO) {
         val file = File(song.filePath)
         val deleted = file.delete()
-        if (deleted) refreshDownloadedSongs()
+        if (deleted) {
+            // Also clean up cached artwork
+            val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
+            if (cacheFile.exists()) cacheFile.delete()
+            refreshDownloadedSongs()
+        }
         deleted
     }
 }
