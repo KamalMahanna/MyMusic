@@ -11,9 +11,9 @@ import javax.inject.Singleton
 class MusicRepository @Inject constructor(
     private val api: SaavnApi
 ) {
-    suspend fun searchSongs(query: String, page: Int = 0): Result<SearchSongResult> = withContext(Dispatchers.IO) {
+    suspend fun searchSongs(query: String, page: Int = 0, limit: Int = 50): Result<SearchSongResult> = withContext(Dispatchers.IO) {
         try {
-            val response = api.searchSongs(query, page)
+            val response = api.searchSongs(query, page, limit)
             if (response.success && response.data != null) {
                 Result.success(response.data.clean())
             } else {
@@ -24,9 +24,9 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun searchArtists(query: String, page: Int = 0): Result<SearchArtistResult> = withContext(Dispatchers.IO) {
+    suspend fun searchArtists(query: String, page: Int = 0, limit: Int = 50): Result<SearchArtistResult> = withContext(Dispatchers.IO) {
         try {
-            val response = api.searchArtists(query, page)
+            val response = api.searchArtists(query, page, limit)
             if (response.success && response.data != null) {
                 Result.success(response.data.clean())
             } else {
