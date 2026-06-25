@@ -20,6 +20,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.background
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -98,7 +101,7 @@ fun SearchScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { /* TODO: Artist detail */ }
+                                .clickable { viewModel.selectArtist(artist.id) }
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -117,5 +120,113 @@ fun SearchScreen(
                 }
             }
         }
+    }
+
+    if (uiState.isArtistDetailLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f))
+                .clickable(enabled = false) {}, // Block clicks underneath
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    }
+
+    if (uiState.selectedArtistDetail != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.clearSelectedArtist() },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            val artistDetail = uiState.selectedArtistDetail!!
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = artistDetail.highQualityImageUrl,
+                        contentDescription = artistDetail.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = artistDetail.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val followerCount = artistDetail.followerCount ?: artistDetail.fanCount
+                        if (followerCount != null) {
+                            Text(
+                                text = "${formatCount(followerCount)} Followers",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Top Songs",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                val topSongs = artistDetail.topSongs ?: emptyList()
+                if (topSongs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No songs found.")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        itemsIndexed(topSongs) { index, song ->
+                            val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
+                            val isDownloaded = playerViewModel.isSongDownloaded(song)
+                            SongListItem(
+                                song = song,
+                                onClick = { playerViewModel.playSongFromList(topSongs, index) },
+                                onDownloadClick = { playerViewModel.downloadSong(song) },
+                                isDownloaded = isDownloaded,
+                                isDownloading = isDownloading
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatCount(count: Int): String {
+    return if (count >= 1_000_000) {
+        "%.1fM".format(count / 1_000_000f)
+    } else if (count >= 1_000) {
+        "%.1fK".format(count / 1_000f)
+    } else {
+        count.toString()
     }
 }

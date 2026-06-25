@@ -2,6 +2,7 @@ package com.metromusic.app.ui.screens.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.metromusic.app.data.model.ArtistDetail
 import com.metromusic.app.data.model.SearchArtist
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.data.repository.MusicRepository
@@ -20,7 +21,9 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val songs: List<Song> = emptyList(),
     val artists: List<SearchArtist> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val isArtistDetailLoading: Boolean = false,
+    val selectedArtistDetail: ArtistDetail? = null
 )
 
 enum class SearchFilter {
@@ -77,5 +80,28 @@ class SearchViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun selectArtist(artistId: String) {
+        _uiState.value = _uiState.value.copy(isArtistDetailLoading = true, selectedArtistDetail = null)
+        viewModelScope.launch {
+            musicRepository.getArtistById(artistId)
+                .onSuccess { detail ->
+                    _uiState.value = _uiState.value.copy(
+                        isArtistDetailLoading = false,
+                        selectedArtistDetail = detail
+                    )
+                }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isArtistDetailLoading = false,
+                        error = e.message
+                    )
+                }
+        }
+    }
+
+    fun clearSelectedArtist() {
+        _uiState.value = _uiState.value.copy(selectedArtistDetail = null)
     }
 }
