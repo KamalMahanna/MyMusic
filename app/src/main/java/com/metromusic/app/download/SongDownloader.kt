@@ -17,8 +17,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.FileOutputStream
 import java.io.File
-import com.mpatric.mp3agic.Mp3File
-import com.mpatric.mp3agic.ID3v23Tag
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.images.ArtworkFactory
+import java.util.logging.Logger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -109,7 +111,7 @@ class SongDownloader @Inject constructor(
             }
 
             // Write ID3 metadata and download/embed artwork
-            writeId3Tags(file, song)
+            writeMetadataTags(file, song)
 
             _downloadState.value = DownloadState(
                 songId = song.id,
@@ -159,43 +161,35 @@ class SongDownloader @Inject constructor(
         notificationManager.notify(NOTIFICATION_ID + 1, notification)
     }
 
-    private fun writeId3Tags(file: File, song: Song) {
+    private fun writeMetadataTags(file: File, song: Song) {
         try {
+            // Suppress verbose jaudiotagger logging
+            Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
+
+            val audioFile = AudioFileIO.read(file)
+            val tag = audioFile.tagOrCreateAndSetDefault
+
+            tag.setField(FieldKey.TITLE, song.name)
+            tag.setField(FieldKey.ARTIST, song.primaryArtistNames)
+            tag.setField(FieldKey.ALBUM, song.album.name ?: "")
+
+            // Download and embed cover art
             val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)
-            
-            val mp3File = Mp3File(file.absolutePath)
-            val tag = if (mp3File.hasId3v2Tag()) {
-                mp3File.id3v2Tag
-            } else {
-                val newTag = ID3v23Tag()
-                mp3File.id3v2Tag = newTag
-                newTag
-            }
-
-            tag.title = song.name
-            tag.artist = song.primaryArtistNames
-            tag.album = song.album.name ?: ""
-            
             if (imageBytes != null) {
-                val mimeType = if (song.highQualityImageUrl?.endsWith(".png", ignoreCase = true) == true) {
-                    "image/png"
-                } else {
-                    "image/jpeg"
+                try {
+                    // Write image to a temp file for ArtworkFactory
+                    val tempImageFile = File(file.parent, "_cover_temp.jpg")
+                    tempImageFile.writeBytes(imageBytes)
+                    val artwork = ArtworkFactory.createArtworkFromFile(tempImageFile)
+                    tag.deleteArtworkField()
+                    tag.setField(artwork)
+                    tempImageFile.delete()
+                } catch (artEx: Exception) {
+                    artEx.printStackTrace()
                 }
-                tag.setAlbumImage(imageBytes, mimeType)
             }
 
-            val tempFile = File(file.absolutePath + ".tmp")
-            mp3File.save(tempFile.absolutePath)
-
-            if (tempFile.exists()) {
-                tempFile.inputStream().use { input ->
-                    file.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                tempFile.delete()
-            }
+            audioFile.commit()
         } catch (e: Exception) {
             e.printStackTrace()
         }

@@ -34,12 +34,16 @@ class DownloadRepository @Inject constructor(
     fun getFileForSong(song: Song): File {
         val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
-        val fileName = "$sanitizedName - $sanitizedArtist.mp3"
+        val fileName = "$sanitizedName - $sanitizedArtist.m4a"
         return File(downloadDir, fileName)
     }
 
     fun isSongDownloaded(song: Song): Boolean {
-        return getFileForSong(song).exists()
+        if (getFileForSong(song).exists()) return true
+        // Backward compatibility: check old .mp3 extension
+        val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+        val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+        return File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3").exists()
     }
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
@@ -49,7 +53,10 @@ class DownloadRepository @Inject constructor(
             return@withContext
         }
 
-        val songs = dir.listFiles()?.filter { it.extension.equals("mp3", ignoreCase = true) }?.map { file ->
+        val songs = dir.listFiles()?.filter {
+            val ext = it.extension.lowercase()
+            ext == "m4a" || ext == "mp3" || ext == "mp4"
+        }?.map { file ->
             val retriever = android.media.MediaMetadataRetriever()
             var name = file.nameWithoutExtension
             var artist = "Unknown Artist"
