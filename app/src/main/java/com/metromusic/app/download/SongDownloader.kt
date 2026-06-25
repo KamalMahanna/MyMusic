@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.data.repository.DownloadRepository
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,11 @@ class SongDownloader @Inject constructor(
             isDownloading = true
         )
 
+        val tempFile = File(context.cacheDir, "temp_download_${song.id}.m4a")
+        if (tempFile.exists()) tempFile.delete()
+
         try {
+            Log.d("SongDownloader", "Downloading to temp file: ${tempFile.absolutePath}")
             val request = Request.Builder().url(downloadUrl).build()
             val response = okHttpClient.newCall(request).execute()
 
@@ -89,9 +94,7 @@ class SongDownloader @Inject constructor(
             val totalBytes = body.contentLength()
             var downloadedBytes = 0L
 
-            file.parentFile?.mkdirs()
-
-            FileOutputStream(file).use { output ->
+            FileOutputStream(tempFile).use { output ->
                 body.byteStream().use { input ->
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
@@ -110,8 +113,14 @@ class SongDownloader @Inject constructor(
                 }
             }
 
-            // Write ID3 metadata and download/embed artwork
-            writeMetadataTags(file, song)
+            Log.d("SongDownloader", "Finished downloading. Writing metadata tags.")
+            // Write metadata and download/embed artwork
+            writeMetadataTags(tempFile, song)
+
+            Log.d("SongDownloader", "Copying tagged file to final destination: ${file.absolutePath}")
+            file.parentFile?.mkdirs()
+            tempFile.copyTo(file, overwrite = true)
+            tempFile.delete()
 
             _downloadState.value = DownloadState(
                 songId = song.id,
@@ -125,7 +134,9 @@ class SongDownloader @Inject constructor(
             downloadRepository.refreshDownloadedSongs()
             true
         } catch (e: Exception) {
-            file.delete()
+            Log.e("SongDownloader", "Error during download/tagging", e)
+            if (tempFile.exists()) tempFile.delete()
+            if (file.exists()) file.delete()
             _downloadState.value = DownloadState(
                 songId = song.id,
                 songName = song.name,
@@ -166,9 +177,11 @@ class SongDownloader @Inject constructor(
             // Suppress verbose jaudiotagger logging
             Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
 
+            Log.d("SongDownloader", "Reading audio file: ${file.absolutePath}")
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
 
+            Log.d("SongDownloader", "Setting metadata: Title=${song.name}, Artist=${song.primaryArtistNames}, Album=${song.album.name}")
             tag.setField(FieldKey.TITLE, song.name)
             tag.setField(FieldKey.ARTIST, song.primaryArtistNames)
             tag.setField(FieldKey.ALBUM, song.album.name ?: "")
@@ -177,21 +190,27 @@ class SongDownloader @Inject constructor(
             val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)
             if (imageBytes != null) {
                 try {
-                    // Write image to a temp file for ArtworkFactory
-                    val tempImageFile = File(file.parent, "_cover_temp.jpg")
+                    Log.d("SongDownloader", "Downloading artwork from ${song.highQualityImageUrl} (size=${imageBytes.size} bytes)")
+                    // Write image to a temp file in cache for ArtworkFactory
+                    val tempImageFile = File(context.cacheDir, "temp_artwork_${song.id}.jpg")
                     tempImageFile.writeBytes(imageBytes)
                     val artwork = ArtworkFactory.createArtworkFromFile(tempImageFile)
                     tag.deleteArtworkField()
                     tag.setField(artwork)
                     tempImageFile.delete()
+                    Log.d("SongDownloader", "Artwork successfully embedded in tag")
                 } catch (artEx: Exception) {
-                    artEx.printStackTrace()
+                    Log.e("SongDownloader", "Failed to write artwork tag", artEx)
                 }
+            } else {
+                Log.w("SongDownloader", "No artwork bytes downloaded")
             }
 
+            Log.d("SongDownloader", "Committing audio file...")
             audioFile.commit()
+            Log.d("SongDownloader", "Successfully committed tags to file.")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("SongDownloader", "Failed to write metadata tags", e)
         }
     }
 
