@@ -18,7 +18,7 @@ import okhttp3.Request
 import java.io.FileOutputStream
 import java.io.File
 import com.mpatric.mp3agic.Mp3File
-import com.mpatric.mp3agic.ID3v24Tag
+import com.mpatric.mp3agic.ID3v23Tag
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -167,7 +167,7 @@ class SongDownloader @Inject constructor(
             val tag = if (mp3File.hasId3v2Tag()) {
                 mp3File.id3v2Tag
             } else {
-                val newTag = ID3v24Tag()
+                val newTag = ID3v23Tag()
                 mp3File.id3v2Tag = newTag
                 newTag
             }
@@ -189,8 +189,12 @@ class SongDownloader @Inject constructor(
             mp3File.save(tempFile.absolutePath)
 
             if (tempFile.exists()) {
-                file.delete()
-                tempFile.renameTo(file)
+                tempFile.inputStream().use { input ->
+                    file.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                tempFile.delete()
             }
         } catch (e: Exception) {
             e.printStackTrace()
