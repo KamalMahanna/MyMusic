@@ -379,6 +379,7 @@ fun PlayerScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueView(
     viewModel: PlayerViewModel,
@@ -387,6 +388,7 @@ fun QueueView(
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
     val listState = rememberLazyListState()
 
     // Detect if we are scrolled to the top
@@ -433,64 +435,113 @@ fun QueueView(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
     ) {
-        // Title is now managed by the top bar.
-
-        
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
-            itemsIndexed(queue) { index, song ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                            else MaterialTheme.colorScheme.surface
-                        )
-                        .clickable { viewModel.playQueueIndex(index) }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = song.highQualityImageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = song.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.primaryArtistNames,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            itemsIndexed(
+                items = queue,
+                key = { index, song -> "${song.id}_$index" }
+            ) { index, song ->
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = { value ->
+                        if (value == SwipeToDismissBoxValue.StartToEnd) {
+                            viewModel.removeFromQueue(index)
+                            true
+                        } else false
                     }
-                    if (index == currentIndex) {
-                        Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Playing",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        IconButton(onClick = { viewModel.removeFromQueue(index) }) {
+                )
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    enableDismissFromStartToEnd = true,
+                    enableDismissFromEndToStart = false,
+                    backgroundContent = {
+                        val color = when (dismissState.targetValue) {
+                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(color)
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Remove"
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
                             )
+                        }
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .clickable { viewModel.playQueueIndex(index) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = song.highQualityImageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = song.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = song.primaryArtistNames,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        
+                        if (index == currentIndex) {
+                            Icon(
+                                imageVector = Icons.Default.VolumeUp,
+                                contentDescription = "Playing",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        } else {
+                            val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
+                            val isDownloaded = viewModel.isSongDownloaded(song)
+
+                            if (isDownloading) {
+                                CircularProgressIndicator(
+                                    progress = { downloadState.progress },
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.5.dp
+                                )
+                            } else {
+                                IconButton(onClick = { viewModel.downloadSong(song) }) {
+                                    Icon(
+                                        imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                        contentDescription = "Download",
+                                        tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -498,6 +549,7 @@ fun QueueView(
         }
     }
 }
+
 
 private fun formatMillis(millis: Long): String {
     val totalSeconds = millis / 1000
