@@ -32,38 +32,68 @@ class MusicPlayerManager @Inject constructor(
     private var exoPlayer: ExoPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var progressJob: Job? = null
+    private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
+    fun getPlayer(): ExoPlayer {
+        return getOrCreatePlayer()
+    }
+
     private fun getOrCreatePlayer(): ExoPlayer {
-        return exoPlayer ?: ExoPlayer.Builder(context).build().also { player ->
-            exoPlayer = player
-            player.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_BUFFERING -> {
-                            _playbackState.value = _playbackState.value.copy(isBuffering = true)
+        return exoPlayer ?: ExoPlayer.Builder(context)
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+            .also { player ->
+                exoPlayer = player
+                player.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        when (playbackState) {
+                            Player.STATE_BUFFERING -> {
+                                _playbackState.value = _playbackState.value.copy(isBuffering = true)
+                            }
+                            Player.STATE_READY -> {
+                                _playbackState.value = _playbackState.value.copy(
+                                    isBuffering = false,
+                                    duration = player.duration.coerceAtLeast(0)
+                                )
+                            }
+                            Player.STATE_ENDED -> {
+                                scope.launch { playNext() }
+                            }
+                            Player.STATE_IDLE -> {}
                         }
-                        Player.STATE_READY -> {
-                            _playbackState.value = _playbackState.value.copy(
-                                isBuffering = false,
-                                duration = player.duration.coerceAtLeast(0)
-                            )
+                    }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
+                        if (isPlaying) startProgressUpdate() else stopProgressUpdate()
+                    }
+                })
+
+                // Auto-play when audio device (headphones/bluetooth) connects
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                val callback = object : android.media.AudioDeviceCallback() {
+                    override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                        val hasHeadphones = addedDevices?.any { device ->
+                            device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                            device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                            device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            device.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                        } == true
+                        
+                        if (hasHeadphones) {
+                            if (player.mediaItemCount > 0 && !player.isPlaying) {
+                                player.play()
+                            }
                         }
-                        Player.STATE_ENDED -> {
-                            scope.launch { playNext() }
-                        }
-                        Player.STATE_IDLE -> {}
                     }
                 }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
-                    if (isPlaying) startProgressUpdate() else stopProgressUpdate()
-                }
-            })
-        }
+                audioManager.registerAudioDeviceCallback(callback, null)
+                audioDeviceCallback = callback
+            }
     }
 
     fun playSong(song: Song) {
@@ -184,6 +214,15 @@ class MusicPlayerManager @Inject constructor(
     fun release() {
         stopProgressUpdate()
         scope.cancel()
+        audioDeviceCallback?.let { callback ->
+            try {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                audioManager.unregisterAudioDeviceCallback(callback)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        audioDeviceCallback = null
         exoPlayer?.release()
         exoPlayer = null
     }

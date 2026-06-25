@@ -25,7 +25,7 @@ class MusicService : MediaSessionService() {
         super.onCreate()
         createNotificationChannel()
 
-        val player = ExoPlayer.Builder(this).build()
+        val player = musicPlayerManager.getPlayer()
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
@@ -35,7 +35,6 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.run {
-            player.release()
             release()
             mediaSession = null
         }

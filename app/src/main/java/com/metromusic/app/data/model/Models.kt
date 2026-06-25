@@ -214,3 +214,82 @@ data class DownloadedSong(
             return if (mb >= 1) "%.1f MB".format(mb) else "%.0f KB".format(kb)
         }
 }
+
+fun String.unescapeHtml(): String {
+    return try {
+        android.text.Html.fromHtml(this, android.text.Html.FROM_HTML_MODE_LEGACY).toString()
+    } catch (e: Exception) {
+        this
+    }
+}
+
+fun Song.clean(): Song {
+    return this.copy(
+        name = name.unescapeHtml(),
+        album = album.copy(name = album.name?.unescapeHtml()),
+        artists = artists.copy(
+            primary = artists.primary.map { it.copy(name = it.name.unescapeHtml()) },
+            featured = artists.featured.map { it.copy(name = it.name.unescapeHtml()) },
+            all = artists.all.map { it.copy(name = it.name.unescapeHtml()) }
+        )
+    )
+}
+
+fun Album.clean(): Album {
+    return this.copy(
+        name = name.unescapeHtml(),
+        description = description?.unescapeHtml(),
+        songs = songs?.map { it.clean() }
+    )
+}
+
+fun Playlist.clean(): Playlist {
+    return this.copy(
+        name = name.unescapeHtml(),
+        description = description?.unescapeHtml(),
+        songs = songs?.map { it.clean() }
+    )
+}
+
+fun ArtistDetail.clean(): ArtistDetail {
+    return this.copy(
+        name = name.unescapeHtml(),
+        topSongs = topSongs?.map { it.clean() },
+        topAlbums = topAlbums?.map { it.clean() },
+        singles = singles?.map { it.clean() }
+    )
+}
+
+fun SearchSongResult.clean(): SearchSongResult {
+    return this.copy(
+        results = results.map { it.clean() }
+    )
+}
+
+fun SearchArtist.clean(): SearchArtist {
+    return this.copy(
+        name = name.unescapeHtml()
+    )
+}
+
+fun SearchArtistResult.clean(): SearchArtistResult {
+    return this.copy(
+        results = results.map { it.clean() }
+    )
+}
+
+fun ModuleItem.clean(): ModuleItem {
+    return this.copy(
+        name = name.unescapeHtml(),
+        subtitle = subtitle?.unescapeHtml()
+    )
+}
+
+fun ModuleSection.clean(): ModuleSection {
+    return this.copy(
+        title = title.unescapeHtml(),
+        subtitle = subtitle?.unescapeHtml(),
+        data = data.map { it.clean() }
+    )
+}
+

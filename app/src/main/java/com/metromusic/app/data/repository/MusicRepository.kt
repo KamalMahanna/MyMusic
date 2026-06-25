@@ -15,7 +15,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.searchSongs(query, page)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.clean())
             } else {
                 Result.failure(Exception("Search failed"))
             }
@@ -28,7 +28,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.searchArtists(query, page)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.clean())
             } else {
                 Result.failure(Exception("Artist search failed"))
             }
@@ -41,7 +41,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getSongById(id)
             if (response.success && response.data != null && response.data.isNotEmpty()) {
-                Result.success(response.data.first())
+                Result.success(response.data.first().clean())
             } else {
                 Result.failure(Exception("Song not found"))
             }
@@ -54,7 +54,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getSongSuggestions(songId, limit)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.map { it.clean() })
             } else {
                 Result.failure(Exception("No suggestions found"))
             }
@@ -67,7 +67,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getArtistById(id)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.clean())
             } else {
                 Result.failure(Exception("Artist not found"))
             }
@@ -80,7 +80,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getAlbumById(id)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.clean())
             } else {
                 Result.failure(Exception("Album not found"))
             }
@@ -93,7 +93,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getPlaylistById(id)
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.clean())
             } else {
                 Result.failure(Exception("Playlist not found"))
             }
@@ -106,7 +106,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getModules()
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.map { it.clean() })
             } else {
                 Result.failure(Exception("Failed to load modules"))
             }
@@ -119,7 +119,7 @@ class MusicRepository @Inject constructor(
         try {
             val response = api.getTrending()
             if (response.success && response.data != null) {
-                Result.success(response.data)
+                Result.success(response.data.map { it.clean() })
             } else {
                 Result.failure(Exception("Failed to load trending"))
             }
