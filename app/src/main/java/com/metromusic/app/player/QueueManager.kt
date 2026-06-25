@@ -19,6 +19,7 @@ class QueueManager @Inject constructor(
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
     private val playedSongIds = mutableSetOf<String>()
+    private val playedKeys = mutableSetOf<Pair<String, String>>()
     private var isLoadingSuggestions = false
 
     val currentSong: Song?
@@ -29,24 +30,61 @@ class QueueManager @Inject constructor(
         }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0) {
-        _queue.value = songs.toList()
-        _currentIndex.value = startIndex
+        val originalTargetSong = if (startIndex in songs.indices) songs[startIndex] else null
+
+        val uniqueSongs = mutableListOf<Song>()
+        val seenKeys = mutableSetOf<Pair<String, String>>()
+        songs.forEach { song ->
+            val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+            if (seenKeys.add(key)) {
+                uniqueSongs.add(song)
+            }
+        }
+
+        _queue.value = uniqueSongs
         playedSongIds.clear()
-        songs.forEach { playedSongIds.add(it.id) }
+        playedKeys.clear()
+        uniqueSongs.forEach {
+            playedSongIds.add(it.id)
+            playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+        }
+
+        val newIndex = if (originalTargetSong != null) {
+            uniqueSongs.indexOfFirst { it.id == originalTargetSong.id }
+        } else {
+            -1
+        }
+        _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, uniqueSongs.size - 1)
     }
 
     fun addToQueue(song: Song) {
-        if (!playedSongIds.contains(song.id)) {
+        val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+        if (!playedSongIds.contains(song.id) && !playedKeys.contains(key)) {
             _queue.value = _queue.value + song
             playedSongIds.add(song.id)
+            playedKeys.add(key)
         }
     }
 
     fun addToQueue(songs: List<Song>) {
-        val newSongs = songs.filter { !playedSongIds.contains(it.id) }
+        val newSongs = songs.filter { song ->
+            val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+            !playedSongIds.contains(song.id) && !playedKeys.contains(key)
+        }
         if (newSongs.isNotEmpty()) {
-            _queue.value = _queue.value + newSongs
-            newSongs.forEach { playedSongIds.add(it.id) }
+            val uniqueIncoming = mutableListOf<Song>()
+            val incomingKeys = mutableSetOf<Pair<String, String>>()
+            newSongs.forEach { song ->
+                val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+                if (incomingKeys.add(key)) {
+                    uniqueIncoming.add(song)
+                }
+            }
+            _queue.value = _queue.value + uniqueIncoming
+            uniqueIncoming.forEach {
+                playedSongIds.add(it.id)
+                playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+            }
         }
     }
 
@@ -96,13 +134,16 @@ class QueueManager @Inject constructor(
         _queue.value = emptyList()
         _currentIndex.value = -1
         playedSongIds.clear()
+        playedKeys.clear()
     }
 
     fun removeAt(index: Int) {
         val mutableQueue = _queue.value.toMutableList()
         if (index in mutableQueue.indices) {
-            mutableQueue.removeAt(index)
+            val removedSong = mutableQueue.removeAt(index)
             _queue.value = mutableQueue
+            playedSongIds.remove(removedSong.id)
+            playedKeys.remove(removedSong.name.lowercase().trim() to removedSong.primaryArtistNames.lowercase().trim())
             if (index < _currentIndex.value) {
                 _currentIndex.value = _currentIndex.value - 1
             }

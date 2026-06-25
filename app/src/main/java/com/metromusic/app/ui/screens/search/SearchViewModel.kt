@@ -61,7 +61,10 @@ class SearchViewModel @Inject constructor(
             if (filter == SearchFilter.SONGS) {
                 val result = musicRepository.searchSongs(query)
                 result.onSuccess { res ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, songs = res.results, artists = emptyList())
+                    val uniqueSongs = res.results.distinctBy { song ->
+                        song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+                    }
+                    _uiState.value = _uiState.value.copy(isLoading = false, songs = uniqueSongs, artists = emptyList())
                 }.onFailure { e ->
                     _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
                 }
