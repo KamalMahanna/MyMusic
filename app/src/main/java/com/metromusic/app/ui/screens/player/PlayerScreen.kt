@@ -1,9 +1,19 @@
 package com.metromusic.app.ui.screens.player
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -61,7 +71,7 @@ fun PlayerScreen(
                     dragOffsetY += dragAmount.y
                 },
                 onDragEnd = {
-                    val swipeThresholdPx = with(density) { 80.dp.toPx() }
+                    val swipeThresholdPx = with(density) { 30.dp.toPx() }
                     if (kotlin.math.abs(dragOffsetX) > kotlin.math.abs(dragOffsetY)) {
                         // Horizontal Swipe
                         if (dragOffsetX < -swipeThresholdPx) {
@@ -100,27 +110,31 @@ fun PlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
             .then(playerGestureModifier),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Top Bar (Collapse & Queue toggle buttons)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onCollapse) {
+            IconButton(
+                onClick = {
+                    if (showQueue) showQueue = false else onCollapse()
+                }
+            ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Collapse Player",
+                    contentDescription = "Back",
                     modifier = Modifier.size(32.dp)
                 )
             }
             Text(
-                text = "NOW PLAYING",
+                text = if (showQueue) "PLAY QUEUE" else "NOW PLAYING",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -137,154 +151,225 @@ fun PlayerScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (showQueue) {
-            // Queue View
-            QueueView(
-                viewModel = viewModel,
-                onSwipeDown = { showQueue = false }
-            )
-        } else {
-            // Main Player View
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f)
-            ) {
-                // Large Artwork
-                AsyncImage(
-                    model = song.highQualityImageUrl,
-                    contentDescription = "Artwork",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth(0.95f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(24.dp))
+        AnimatedContent(
+            targetState = showQueue,
+            transitionSpec = {
+                if (targetState) {
+                    // Slide up & fade in queue, slide up & fade out player
+                    (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
+                     fadeIn(animationSpec = tween(300)))
+                        .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
+                                      fadeOut(animationSpec = tween(300)))
+                } else {
+                    // Slide down & fade in player, slide down & fade out queue
+                    (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
+                     fadeIn(animationSpec = tween(300)))
+                        .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
+                                      fadeOut(animationSpec = tween(300)))
+                }
+            },
+            label = "QueueTransition",
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+        ) { isQueueVisible ->
+            if (isQueueVisible) {
+                // Queue View
+                QueueView(
+                    viewModel = viewModel,
+                    onSwipeDown = { showQueue = false }
                 )
+            } else {
+                // Main Player View
+                var prevIndex by remember { mutableStateOf(currentIndex) }
+                val isNext = currentIndex >= prevIndex
 
-                Spacer(modifier = Modifier.weight(1f))
+                LaunchedEffect(currentIndex) {
+                    prevIndex = currentIndex
+                }
 
-                // Song Title & Artist
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    // Only Artwork & Info transitions horizontally
+                    AnimatedContent(
+                        targetState = song,
+                        transitionSpec = {
+                            if (isNext) {
+                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                 fadeIn(animationSpec = tween(250)))
+                                    .togetherWith(
+                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                        fadeOut(animationSpec = tween(250))
+                                    )
+                            } else {
+                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                 fadeIn(animationSpec = tween(250)))
+                                    .togetherWith(
+                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                        fadeOut(animationSpec = tween(250))
+                                    )
+                            }
+                        },
+                        label = "SongChangeTransition",
+                        modifier = Modifier.weight(1.0f)
+                    ) { currentSong ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // Large Artwork
+                            AsyncImage(
+                                model = currentSong.highQualityImageUrl,
+                                contentDescription = "Artwork",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth(0.85f)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(24.dp))
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // Song Title & Artist Info
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = currentSong.name,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .basicMarquee(
+                                                iterations = Int.MAX_VALUE,
+                                                spacing = MarqueeSpacing(48.dp)
+                                            )
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = currentSong.primaryArtistNames,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                // Download Button
+                                val isDownloading = downloadState.songId == currentSong.id && downloadState.isDownloading
+                                val isDownloaded = viewModel.isSongDownloaded(currentSong)
+                                
+                                if (isDownloading) {
+                                    CircularProgressIndicator(
+                                        progress = { downloadState.progress },
+                                        modifier = Modifier.size(28.dp),
+                                        strokeWidth = 3.dp
+                                    )
+                                } else {
+                                    IconButton(onClick = { viewModel.downloadSong(currentSong) }) {
+                                        Icon(
+                                            imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                            contentDescription = "Download High Quality 320kbps",
+                                            modifier = Modifier.size(28.dp),
+                                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Progress Slider (Static)
+                    val progress = if (playbackState.duration > 0) {
+                        playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+                    } else 0f
+
+                    var sliderPosition by remember { mutableStateOf<Float?>(null) }
+
+                    Slider(
+                        value = sliderPosition ?: progress,
+                        onValueChange = { sliderPosition = it },
+                        onValueChangeFinished = {
+                            sliderPosition?.let { pos ->
+                                viewModel.seekTo((pos * playbackState.duration).toLong())
+                            }
+                            sliderPosition = null
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Progress Time Labels
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = song.name,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = formatMillis(playbackState.currentPosition),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = song.primaryArtistNames,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = formatMillis(playbackState.duration),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    // Download Button
-                    val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                    val isDownloaded = viewModel.isSongDownloaded(song)
-                    
-                    if (isDownloading) {
-                        CircularProgressIndicator(
-                            progress = { downloadState.progress },
-                            modifier = Modifier.size(32.dp),
-                            strokeWidth = 3.dp
-                        )
-                    } else {
-                        IconButton(onClick = { viewModel.downloadSong(song) }) {
+                    Spacer(modifier = Modifier.weight(0.2f))
+
+                    // Controls Row (Static)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { viewModel.playPrevious() }) {
                             Icon(
-                                imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                                contentDescription = "Download High Quality 320kbps",
-                                modifier = Modifier.size(32.dp),
-                                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                                imageVector = Icons.Default.SkipPrevious,
+                                contentDescription = "Previous",
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
+
+                        FloatingActionButton(
+                            onClick = { viewModel.togglePlayPause() },
+                            shape = RoundedCornerShape(100.dp),
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+
+                        IconButton(onClick = { viewModel.playNext() }) {
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Next",
+                                modifier = Modifier.size(48.dp)
                             )
                         }
                     }
+                    
+                    Spacer(modifier = Modifier.weight(0.2f))
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Progress Slider
-                val progress = if (playbackState.duration > 0) {
-                    playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
-                } else 0f
-
-                var sliderPosition by remember { mutableStateOf<Float?>(null) }
-
-                Slider(
-                    value = sliderPosition ?: progress,
-                    onValueChange = { sliderPosition = it },
-                    onValueChangeFinished = {
-                        sliderPosition?.let { pos ->
-                            viewModel.seekTo((pos * playbackState.duration).toLong())
-                        }
-                        sliderPosition = null
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Progress Time Labels
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatMillis(playbackState.currentPosition),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = formatMillis(playbackState.duration),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Controls Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { viewModel.playPrevious() }) {
-                        Icon(
-                            imageVector = Icons.Default.SkipPrevious,
-                            contentDescription = "Previous",
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-
-                    FloatingActionButton(
-                        onClick = { viewModel.togglePlayPause() },
-                        shape = RoundedCornerShape(100.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(72.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-
-                    IconButton(onClick = { viewModel.playNext() }) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Next",
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -309,7 +394,7 @@ fun QueueView(
 
     var dragOffsetY by remember { mutableStateOf(0f) }
     val density = LocalDensity.current
-    val swipeThresholdPx = with(density) { 80.dp.toPx() }
+    val swipeThresholdPx = with(density) { 30.dp.toPx() }
 
     // Intercept scroll-down drags when list is scrolled to the top
     val nestedScrollConnection = remember(isAtTop) {
@@ -344,12 +429,8 @@ fun QueueView(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
     ) {
-        Text(
-            text = "Play Queue",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        // Title is now managed by the top bar.
+
         
         LazyColumn(
             state = listState,
