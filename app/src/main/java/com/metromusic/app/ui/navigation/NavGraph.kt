@@ -88,7 +88,7 @@ fun MetroMusicNavGraph() {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     composable(Screen.Home.route) { HomeScreen() }
-                    composable(Screen.Search.route) { SearchScreen() }
+                    composable(Screen.Search.route) { SearchScreen(isPlayerExpanded = isPlayerExpanded) }
                     composable(Screen.Library.route) { LibraryScreen() }
                 }
                 

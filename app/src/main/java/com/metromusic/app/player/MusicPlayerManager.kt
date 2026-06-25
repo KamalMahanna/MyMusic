@@ -1,6 +1,9 @@
 package com.metromusic.app.player
 
 import android.content.Context
+import android.content.Intent
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -43,6 +46,13 @@ class MusicPlayerManager @Inject constructor(
 
     private fun getOrCreatePlayer(): ExoPlayer {
         return exoPlayer ?: ExoPlayer.Builder(context)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true
+            )
             .setHandleAudioBecomingNoisy(true)
             .build()
             .also { player ->
@@ -98,6 +108,14 @@ class MusicPlayerManager @Inject constructor(
 
     fun playSong(song: Song) {
         val player = getOrCreatePlayer()
+        
+        try {
+            val intent = Intent(context, MusicService::class.java)
+            context.startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val file = downloadRepository.getFileForSong(song)
         
         val uri = when {
@@ -178,6 +196,12 @@ class MusicPlayerManager @Inject constructor(
         if (player.isPlaying) {
             player.pause()
         } else {
+            try {
+                val intent = Intent(context, MusicService::class.java)
+                context.startService(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             player.play()
         }
     }

@@ -23,12 +23,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
+    isPlayerExpanded: Boolean,
     viewModel: SearchViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -36,9 +39,19 @@ fun SearchScreen(
     val downloadState by playerViewModel.downloadState.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+        keyboardController?.show()
+    }
+
+    LaunchedEffect(isPlayerExpanded) {
+        if (isPlayerExpanded) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
