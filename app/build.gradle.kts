@@ -74,6 +74,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.coroutines.android)
+    implementation(libs.mp3agic)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

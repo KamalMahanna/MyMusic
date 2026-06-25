@@ -16,6 +16,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.FileOutputStream
+import java.io.File
+import com.mpatric.mp3agic.Mp3File
+import com.mpatric.mp3agic.ID3v24Tag
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -105,6 +108,9 @@ class SongDownloader @Inject constructor(
                 }
             }
 
+            // Write ID3 metadata and download/embed artwork
+            writeId3Tags(file, song)
+
             _downloadState.value = DownloadState(
                 songId = song.id,
                 songName = song.name,
@@ -151,6 +157,60 @@ class SongDownloader @Inject constructor(
             .build()
 
         notificationManager.notify(NOTIFICATION_ID + 1, notification)
+    }
+
+    private fun writeId3Tags(file: File, song: Song) {
+        try {
+            val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)
+            
+            val mp3File = Mp3File(file.absolutePath)
+            val tag = if (mp3File.hasId3v2Tag()) {
+                mp3File.id3v2Tag
+            } else {
+                val newTag = ID3v24Tag()
+                mp3File.id3v2Tag = newTag
+                newTag
+            }
+
+            tag.title = song.name
+            tag.artist = song.primaryArtistNames
+            tag.album = song.album.name ?: ""
+            
+            if (imageBytes != null) {
+                val mimeType = if (song.highQualityImageUrl?.endsWith(".png", ignoreCase = true) == true) {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                }
+                tag.setAlbumImage(imageBytes, mimeType)
+            }
+
+            val tempFile = File(file.absolutePath + ".tmp")
+            mp3File.save(tempFile.absolutePath)
+
+            if (tempFile.exists()) {
+                file.delete()
+                tempFile.renameTo(file)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun downloadArtworkBytes(url: String?): ByteArray? {
+        if (url.isNullOrEmpty()) return null
+        return try {
+            val request = Request.Builder().url(url).build()
+            okHttpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    response.body?.bytes()
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     companion object {
