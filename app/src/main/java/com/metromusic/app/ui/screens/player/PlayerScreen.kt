@@ -287,49 +287,48 @@ fun PlayerScreen(
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Progress Slider (Transitions with title)
+                            val progress = if (playbackState.duration > 0) {
+                                playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+                            } else 0f
+
+                            var sliderPosition by remember { mutableStateOf<Float?>(null) }
+
+                            Slider(
+                                value = sliderPosition ?: progress,
+                                onValueChange = { sliderPosition = it },
+                                onValueChangeFinished = {
+                                    sliderPosition?.let { pos ->
+                                        viewModel.seekTo((pos * playbackState.duration).toLong())
+                                    }
+                                    sliderPosition = null
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Progress Time Labels
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = formatMillis(playbackState.currentPosition),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatMillis(playbackState.duration),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Progress Slider (Static)
-                    val progress = if (playbackState.duration > 0) {
-                        playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
-                    } else 0f
-
-                    var sliderPosition by remember { mutableStateOf<Float?>(null) }
-
-                    Slider(
-                        value = sliderPosition ?: progress,
-                        onValueChange = { sliderPosition = it },
-                        onValueChangeFinished = {
-                            sliderPosition?.let { pos ->
-                                viewModel.seekTo((pos * playbackState.duration).toLong())
-                            }
-                            sliderPosition = null
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Progress Time Labels
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = formatMillis(playbackState.currentPosition),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatMillis(playbackState.duration),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.weight(0.2f))
+                    Spacer(modifier = Modifier.weight(0.1f))
 
                     // Controls Row (Static)
                     Row(
@@ -367,8 +366,8 @@ fun PlayerScreen(
                             )
                         }
                     }
-                    
-                    Spacer(modifier = Modifier.weight(0.2f))
+
+                    Spacer(modifier = Modifier.weight(0.1f))
                 }
             }
         }
