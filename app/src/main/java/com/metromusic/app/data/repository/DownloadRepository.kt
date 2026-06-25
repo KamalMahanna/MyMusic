@@ -59,11 +59,23 @@ class DownloadRepository @Inject constructor(
 
             try {
                 retriever.setDataSource(file.absolutePath)
-                name = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension
-                artist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+                val metaTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                val metaArtist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
                 album = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
                 val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
                 duration = durStr?.toIntOrNull()?.let { it / 1000 }
+
+                val parts = file.nameWithoutExtension.split(" - ", limit = 2)
+                val fileTitle = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
+                val fileArtist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
+
+                name = if (!metaTitle.isNullOrBlank()) metaTitle else fileTitle
+                artist = if (!metaArtist.isNullOrBlank() && metaArtist != "Unknown Artist") metaArtist else fileArtist
+
+                if ((artist == "Unknown Artist" || artist.isBlank()) && parts.size > 1) {
+                    name = fileTitle
+                    artist = fileArtist
+                }
 
                 val artworkBytes = retriever.embeddedPicture
                 if (artworkBytes != null) {
