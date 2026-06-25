@@ -116,7 +116,7 @@ data class ArtistDetail(
     val image: List<DownloadLink> = emptyList(),
     val followerCount: Int? = null,
     val fanCount: Int? = null,
-    val isVerified: Boolean = false,
+    val isVerified: Boolean? = false,
     val dominantLanguage: String? = null,
     val dominantType: String? = null,
     val topSongs: List<Song>? = null,
