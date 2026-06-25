@@ -16,6 +16,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -28,13 +32,20 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by playerViewModel.downloadState.collectAsState()
 
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = uiState.query,
             onValueChange = viewModel::onQueryChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(16.dp)
+                .focusRequester(focusRequester),
             placeholder = { Text("Search...") },
             singleLine = true
         )

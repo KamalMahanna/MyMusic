@@ -109,6 +109,11 @@ fun PlayerScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = {} // Consume click events to prevent touch propagation to search/nav UI underneath
+            )
             .background(MaterialTheme.colorScheme.background)
             .then(playerGestureModifier),
         horizontalAlignment = Alignment.CenterHorizontally
