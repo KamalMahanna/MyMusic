@@ -89,9 +89,9 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun getPlaylistById(id: String): Result<Playlist> = withContext(Dispatchers.IO) {
+    suspend fun getPlaylistById(id: String, limit: Int = 1000): Result<Playlist> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getPlaylistById(id)
+            val response = api.getPlaylistById(id, limit = limit)
             if (response.success && response.data != null) {
                 Result.success(response.data.clean())
             } else {

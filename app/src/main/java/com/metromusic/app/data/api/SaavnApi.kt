@@ -32,8 +32,8 @@ interface SaavnApi {
     @GET("api/artists/{id}")
     suspend fun getArtistById(
         @Path("id") id: String,
-        @Query("songCount") songCount: Int = 20,
-        @Query("albumCount") albumCount: Int = 10
+        @Query("songCount") songCount: Int = 50,
+        @Query("albumCount") albumCount: Int = 50
     ): ApiResponse<ArtistDetail>
 
     @GET("api/albums")
@@ -43,7 +43,7 @@ interface SaavnApi {
     suspend fun getPlaylistById(
         @Query("id") id: String,
         @Query("page") page: Int = 0,
-        @Query("limit") limit: Int = 50
+        @Query("limit") limit: Int = 1000
     ): ApiResponse<Playlist>
 
     @GET("api/modules")
