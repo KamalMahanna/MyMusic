@@ -4,10 +4,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.data.repository.DownloadRepository
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,10 +63,18 @@ class SongDownloader @Inject constructor(
     }
 
     suspend fun downloadSong(song: Song): Boolean = withContext(Dispatchers.IO) {
-        val downloadUrl = song.highQualityDownloadUrl ?: return@withContext false
+        Log.d(TAG, "downloadSong: songId='${song.id}', name='${song.name}'")
+        val downloadUrl = song.highQualityDownloadUrl
+        if (downloadUrl == null) {
+            Log.e(TAG, "downloadSong: highQualityDownloadUrl is null for song='${song.name}'")
+            return@withContext false
+        }
         val file = downloadRepository.getFileForSong(song)
 
-        if (file.exists()) return@withContext true
+        if (file.exists()) {
+            Log.d(TAG, "downloadSong: song already downloaded, file exists at '${file.absolutePath}'")
+            return@withContext true
+        }
 
         _downloadState.value = DownloadState(
             songId = song.id,
@@ -75,14 +83,18 @@ class SongDownloader @Inject constructor(
         )
 
         val tempFile = File(context.cacheDir, "temp_download_${song.id}.m4a")
-        if (tempFile.exists()) tempFile.delete()
+        if (tempFile.exists()) {
+            val deleted = tempFile.delete()
+            Log.d(TAG, "downloadSong: Cleaned up pre-existing temp file: $deleted")
+        }
 
         try {
-            Log.d("SongDownloader", "Downloading to temp file: ${tempFile.absolutePath}")
+            Log.d(TAG, "downloadSong: Downloading to temp file: ${tempFile.absolutePath} from URL: $downloadUrl")
             val request = Request.Builder().url(downloadUrl).build()
             val response = okHttpClient.newCall(request).execute()
 
             if (!response.isSuccessful) {
+                Log.e(TAG, "downloadSong: Download request failed with HTTP ${response.code} for URL: $downloadUrl")
                 _downloadState.value = _downloadState.value.copy(
                     isDownloading = false,
                     error = "Download failed: ${response.code}"
@@ -90,9 +102,19 @@ class SongDownloader @Inject constructor(
                 return@withContext false
             }
 
-            val body = response.body ?: return@withContext false
+            val body = response.body
+            if (body == null) {
+                Log.e(TAG, "downloadSong: Response body is null")
+                _downloadState.value = _downloadState.value.copy(
+                    isDownloading = false,
+                    error = "Empty response body"
+                )
+                return@withContext false
+            }
+
             val totalBytes = body.contentLength()
             var downloadedBytes = 0L
+            Log.d(TAG, "downloadSong: Response Content-Length = $totalBytes bytes")
 
             FileOutputStream(tempFile).use { output ->
                 body.byteStream().use { input ->
@@ -113,15 +135,16 @@ class SongDownloader @Inject constructor(
                 }
             }
 
-            Log.d("SongDownloader", "Finished downloading. Writing metadata tags.")
+            Log.d(TAG, "downloadSong: Finished downloading file body ($downloadedBytes bytes). Writing metadata tags.")
             // Write metadata and download/embed artwork
             writeMetadataTags(tempFile, song)
 
-            Log.d("SongDownloader", "Copying tagged file to final destination: ${file.absolutePath}")
+            Log.d(TAG, "downloadSong: Copying tagged file to final destination: ${file.absolutePath}")
             file.parentFile?.mkdirs()
             tempFile.copyTo(file, overwrite = true)
             tempFile.delete()
 
+            Log.d(TAG, "downloadSong: Complete! Saved to ${file.absolutePath}")
             _downloadState.value = DownloadState(
                 songId = song.id,
                 songName = song.name,
@@ -134,7 +157,7 @@ class SongDownloader @Inject constructor(
             downloadRepository.refreshDownloadedSongs()
             true
         } catch (e: Exception) {
-            Log.e("SongDownloader", "Error during download/tagging", e)
+            Log.e(TAG, "downloadSong: Error during download/tagging", e)
             if (tempFile.exists()) tempFile.delete()
             if (file.exists()) file.delete()
             _downloadState.value = DownloadState(
@@ -177,11 +200,11 @@ class SongDownloader @Inject constructor(
             // Suppress verbose jaudiotagger logging
             Logger.getLogger("org.jaudiotagger").level = java.util.logging.Level.OFF
 
-            Log.d("SongDownloader", "Reading audio file: ${file.absolutePath}")
+            Log.d(TAG, "writeMetadataTags: Reading audio file: ${file.absolutePath}")
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tagOrCreateAndSetDefault
 
-            Log.d("SongDownloader", "Setting metadata: Title=${song.name}, Artist=${song.primaryArtistNames}, Album=${song.album.name}")
+            Log.d(TAG, "writeMetadataTags: Setting metadata: Title='${song.name}', Artist='${song.primaryArtistNames}', Album='${song.album.name}'")
             tag.setField(FieldKey.TITLE, song.name)
             tag.setField(FieldKey.ARTIST, song.primaryArtistNames)
             tag.setField(FieldKey.ALBUM, song.album.name ?: "")
@@ -190,7 +213,7 @@ class SongDownloader @Inject constructor(
             val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)
             if (imageBytes != null) {
                 try {
-                    Log.d("SongDownloader", "Downloading artwork from ${song.highQualityImageUrl} (size=${imageBytes.size} bytes)")
+                    Log.d(TAG, "writeMetadataTags: Embedding artwork bytes (size=${imageBytes.size} bytes)")
                     // Write image to a temp file in cache for ArtworkFactory
                     val tempImageFile = File(context.cacheDir, "temp_artwork_${song.id}.jpg")
                     tempImageFile.writeBytes(imageBytes)
@@ -198,39 +221,46 @@ class SongDownloader @Inject constructor(
                     tag.deleteArtworkField()
                     tag.setField(artwork)
                     tempImageFile.delete()
-                    Log.d("SongDownloader", "Artwork successfully embedded in tag")
+                    Log.d(TAG, "writeMetadataTags: Artwork successfully embedded in tag")
                 } catch (artEx: Exception) {
-                    Log.e("SongDownloader", "Failed to write artwork tag", artEx)
+                    Log.e(TAG, "writeMetadataTags: Failed to embed artwork tag", artEx)
                 }
             } else {
-                Log.w("SongDownloader", "No artwork bytes downloaded")
+                Log.w(TAG, "writeMetadataTags: No artwork bytes downloaded")
             }
 
-            Log.d("SongDownloader", "Committing audio file...")
+            Log.d(TAG, "writeMetadataTags: Committing audio file...")
             audioFile.commit()
-            Log.d("SongDownloader", "Successfully committed tags to file.")
+            Log.d(TAG, "writeMetadataTags: Successfully committed tags to file.")
         } catch (e: Exception) {
-            Log.e("SongDownloader", "Failed to write metadata tags", e)
+            Log.e(TAG, "writeMetadataTags: Failed to write metadata tags", e)
         }
     }
 
     private fun downloadArtworkBytes(url: String?): ByteArray? {
-        if (url.isNullOrEmpty()) return null
+        if (url.isNullOrEmpty()) {
+            Log.d(TAG, "downloadArtworkBytes: URL is null or empty")
+            return null
+        }
         return try {
+            Log.d(TAG, "downloadArtworkBytes: Downloading from $url")
             val request = Request.Builder().url(url).build()
             okHttpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     response.body?.bytes()
                 } else {
+                    Log.w(TAG, "downloadArtworkBytes: Failed, HTTP response code ${response.code}")
                     null
                 }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "downloadArtworkBytes: Error fetching artwork from $url: ${e.message}", e)
             null
         }
     }
 
     companion object {
+        private const val TAG = "SongDownloader"
         private const val CHANNEL_ID = "metro_music_downloads"
         private const val NOTIFICATION_ID = 1001
     }

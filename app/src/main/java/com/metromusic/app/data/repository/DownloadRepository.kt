@@ -2,6 +2,7 @@ package com.metromusic.app.data.repository
 
 import android.content.Context
 import android.os.Environment
+import android.util.Log
 import com.metromusic.app.data.model.DownloadedSong
 import com.metromusic.app.data.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,7 +28,10 @@ class DownloadRepository @Inject constructor(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
                 "MyMusic"
             )
-            if (!dir.exists()) dir.mkdirs()
+            if (!dir.exists()) {
+                val created = dir.mkdirs()
+                Log.d(TAG, "downloadDir: Created directory MyMusic: $created")
+            }
             return dir
         }
 
@@ -35,28 +39,43 @@ class DownloadRepository @Inject constructor(
         val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val fileName = "$sanitizedName - $sanitizedArtist.m4a"
-        return File(downloadDir, fileName)
+        val targetFile = File(downloadDir, fileName)
+        Log.d(TAG, "getFileForSong: Target file path '${targetFile.absolutePath}'")
+        return targetFile
     }
 
     fun isSongDownloaded(song: Song): Boolean {
-        if (getFileForSong(song).exists()) return true
+        val primaryFile = getFileForSong(song)
+        if (primaryFile.exists()) {
+            Log.d(TAG, "isSongDownloaded: Song '${song.name}' downloaded (.m4a)")
+            return true
+        }
         // Backward compatibility: check old .mp3 extension
         val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
-        return File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3").exists()
+        val mp3File = File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3")
+        val mp3Exists = mp3File.exists()
+        Log.d(TAG, "isSongDownloaded: Checking .mp3 at '${mp3File.absolutePath}', exists=$mp3Exists")
+        return mp3Exists
     }
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
         val dir = downloadDir
+        Log.d(TAG, "refreshDownloadedSongs: Scanning directory '${dir.absolutePath}'")
         if (!dir.exists()) {
+            Log.w(TAG, "refreshDownloadedSongs: directory does not exist")
             _downloadedSongs.value = emptyList()
             return@withContext
         }
 
-        val songs = dir.listFiles()?.filter {
+        val files = dir.listFiles()?.filter {
             val ext = it.extension.lowercase()
             ext == "m4a" || ext == "mp3" || ext == "mp4"
-        }?.map { file ->
+        } ?: emptyList()
+
+        Log.d(TAG, "refreshDownloadedSongs: Found ${files.size} matching audio files")
+
+        val songs = files.map { file ->
             val retriever = android.media.MediaMetadataRetriever()
             var name = file.nameWithoutExtension
             var artist = "Unknown Artist"
@@ -93,7 +112,7 @@ class DownloadRepository @Inject constructor(
                     imageUrl = cacheFile.absolutePath
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "refreshDownloadedSongs: Error reading metadata for '${file.name}': ${e.message}", e)
                 val parts = file.nameWithoutExtension.split(" - ", limit = 2)
                 name = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
                 artist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
@@ -101,7 +120,7 @@ class DownloadRepository @Inject constructor(
                 try {
                     retriever.release()
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Log.e(TAG, "refreshDownloadedSongs: Error releasing MediaMetadataRetriever", e)
                 }
             }
 
@@ -115,27 +134,42 @@ class DownloadRepository @Inject constructor(
                 imageUrl = imageUrl,
                 fileSize = file.length()
             )
-        }?.sortedByDescending { it.filePath } ?: emptyList()
+        }.sortedByDescending { it.filePath }
 
+        Log.d(TAG, "refreshDownloadedSongs: Refreshed ${songs.size} songs in StateFlow")
         _downloadedSongs.value = songs
     }
 
     fun getCachedArtworkForSong(song: Song): File? {
         val file = getFileForSong(song)
-        if (!file.exists()) return null
+        if (!file.exists()) {
+            Log.d(TAG, "getCachedArtworkForSong: Song file does not exist, no artwork cached")
+            return null
+        }
         val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
-        return if (cacheFile.exists()) cacheFile else null
+        val cacheExists = cacheFile.exists()
+        Log.d(TAG, "getCachedArtworkForSong: Checking cached artwork at '${cacheFile.absolutePath}', exists=$cacheExists")
+        return if (cacheExists) cacheFile else null
     }
 
     suspend fun deleteSong(song: DownloadedSong): Boolean = withContext(Dispatchers.IO) {
         val file = File(song.filePath)
+        Log.d(TAG, "deleteSong: Deleting file '${file.absolutePath}'")
         val deleted = file.delete()
+        Log.d(TAG, "deleteSong: Deletion status: $deleted")
         if (deleted) {
             // Also clean up cached artwork
             val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
-            if (cacheFile.exists()) cacheFile.delete()
+            if (cacheFile.exists()) {
+                val artworkDeleted = cacheFile.delete()
+                Log.d(TAG, "deleteSong: Deleted cached artwork: $artworkDeleted")
+            }
             refreshDownloadedSongs()
         }
         deleted
+    }
+
+    companion object {
+        private const val TAG = "DownloadRepository"
     }
 }

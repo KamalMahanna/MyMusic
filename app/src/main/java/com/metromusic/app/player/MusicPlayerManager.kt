@@ -2,6 +2,7 @@ package com.metromusic.app.player
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -56,9 +57,19 @@ class MusicPlayerManager @Inject constructor(
             .setHandleAudioBecomingNoisy(true)
             .build()
             .also { player ->
+                Log.d(TAG, "ExoPlayer created and configured")
                 exoPlayer = player
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        val stateString = when (playbackState) {
+                            Player.STATE_BUFFERING -> "STATE_BUFFERING"
+                            Player.STATE_READY -> "STATE_READY"
+                            Player.STATE_ENDED -> "STATE_ENDED"
+                            Player.STATE_IDLE -> "STATE_IDLE"
+                            else -> "UNKNOWN"
+                        }
+                        Log.d(TAG, "onPlaybackStateChanged: $stateString")
+
                         when (playbackState) {
                             Player.STATE_BUFFERING -> {
                                 _playbackState.value = _playbackState.value.copy(isBuffering = true)
@@ -70,6 +81,7 @@ class MusicPlayerManager @Inject constructor(
                                 )
                             }
                             Player.STATE_ENDED -> {
+                                Log.d(TAG, "Playback ended, playing next song")
                                 scope.launch { playNext() }
                             }
                             Player.STATE_IDLE -> {}
@@ -77,6 +89,7 @@ class MusicPlayerManager @Inject constructor(
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        Log.d(TAG, "onIsPlayingChanged: isPlaying=$isPlaying")
                         _playbackState.value = _playbackState.value.copy(isPlaying = isPlaying)
                         if (isPlaying) startProgressUpdate() else stopProgressUpdate()
                     }
@@ -86,6 +99,8 @@ class MusicPlayerManager @Inject constructor(
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
                 val callback = object : android.media.AudioDeviceCallback() {
                     override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                        val deviceTypes = addedDevices?.map { it.type }?.joinToString(", ") ?: "None"
+                        Log.d(TAG, "Audio devices added: $deviceTypes")
                         val hasHeadphones = addedDevices?.any { device ->
                             device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
                             device.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
@@ -95,7 +110,9 @@ class MusicPlayerManager @Inject constructor(
                         } == true
                         
                         if (hasHeadphones) {
+                            Log.d(TAG, "Headphones/Bluetooth detected as added. player.mediaItemCount=${player.mediaItemCount}, player.isPlaying=${player.isPlaying}")
                             if (player.mediaItemCount > 0 && !player.isPlaying) {
+                                Log.d(TAG, "Resuming playback due to audio device addition")
                                 player.play()
                             }
                         }
@@ -107,35 +124,45 @@ class MusicPlayerManager @Inject constructor(
     }
 
     fun playSong(song: Song) {
+        Log.d(TAG, "playSong: songId='${song.id}', name='${song.name}', artist='${song.primaryArtistNames}'")
         val player = getOrCreatePlayer()
         
         try {
+            Log.d(TAG, "Starting MusicService")
             val intent = Intent(context, MusicService::class.java)
             context.startService(intent)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
         }
 
         val file = downloadRepository.getFileForSong(song)
         
         val uri = when {
             song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
+                Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
                 if (song.url.startsWith("/")) android.net.Uri.fromFile(java.io.File(song.url)).toString()
                 else song.url
             }
             file.exists() -> {
+                Log.d(TAG, "Found downloaded song file at ${file.absolutePath}")
                 android.net.Uri.fromFile(file).toString()
             }
             else -> {
-                song.highQualityDownloadUrl ?: return
+                val dlUrl = song.highQualityDownloadUrl
+                Log.d(TAG, "Using high quality download URL: $dlUrl")
+                dlUrl ?: return
             }
         }
 
         val localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
         val artworkUri = if (localArtworkFile != null) {
+            Log.d(TAG, "Using cached artwork: ${localArtworkFile.absolutePath}")
             android.net.Uri.fromFile(localArtworkFile)
         } else {
-            song.highQualityImageUrl?.let { android.net.Uri.parse(it) }
+            song.highQualityImageUrl?.let {
+                Log.d(TAG, "Using network artwork URL: $it")
+                android.net.Uri.parse(it)
+            }
         }
 
         val mediaItem = MediaItem.Builder()
@@ -153,6 +180,7 @@ class MusicPlayerManager @Inject constructor(
         player.setMediaItem(mediaItem)
         player.prepare()
         player.play()
+        Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
 
         _playbackState.value = PlaybackState(
             currentSong = song,
@@ -163,57 +191,80 @@ class MusicPlayerManager @Inject constructor(
         // Check if we need more suggestions
         scope.launch {
             if (queueManager.isNearEnd()) {
+                Log.d(TAG, "Queue is near the end, loading suggestions")
                 queueManager.loadMoreSuggestions()
             }
         }
     }
 
     fun playSongFromQueue(songs: List<Song>, index: Int) {
+        Log.d(TAG, "playSongFromQueue: index=$index, size=${songs.size}")
         queueManager.setQueue(songs, index)
-        val song = queueManager.currentSong ?: return
-        playSong(song)
+        val song = queueManager.currentSong
+        if (song != null) {
+            playSong(song)
+        } else {
+            Log.w(TAG, "playSongFromQueue: no song found at index $index")
+        }
     }
 
     suspend fun playNext() {
+        Log.d(TAG, "playNext() invoked")
         if (queueManager.isNearEnd()) {
+            Log.d(TAG, "Queue near end, pre-loading suggestions")
             queueManager.loadMoreSuggestions()
         }
         val nextSong = queueManager.moveToNext()
+        Log.d(TAG, "playNext: nextSong='${nextSong?.name}'")
         if (nextSong != null) {
             playSong(nextSong)
         }
     }
 
     fun playPrevious() {
+        Log.d(TAG, "playPrevious() invoked")
         val prevSong = queueManager.moveToPrevious()
+        Log.d(TAG, "playPrevious: prevSong='${prevSong?.name}'")
         if (prevSong != null) {
             playSong(prevSong)
         }
     }
 
     fun togglePlayPause() {
-        val player = exoPlayer ?: return
+        val player = exoPlayer
+        if (player == null) {
+            Log.w(TAG, "togglePlayPause: player is null")
+            return
+        }
+        Log.d(TAG, "togglePlayPause: currently playing=${player.isPlaying}")
         if (player.isPlaying) {
             player.pause()
         } else {
             try {
+                Log.d(TAG, "Starting MusicService on resume")
                 val intent = Intent(context, MusicService::class.java)
                 context.startService(intent)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
             }
             player.play()
         }
     }
 
     fun seekTo(position: Long) {
+        Log.d(TAG, "seekTo: position=$position")
         exoPlayer?.seekTo(position)
         _playbackState.value = _playbackState.value.copy(currentPosition = position)
     }
 
     fun jumpToQueueIndex(index: Int) {
-        val song = queueManager.jumpTo(index) ?: return
-        playSong(song)
+        Log.d(TAG, "jumpToQueueIndex: index=$index")
+        val song = queueManager.jumpTo(index)
+        if (song != null) {
+            playSong(song)
+        } else {
+            Log.w(TAG, "jumpToQueueIndex: no song at index $index")
+        }
     }
 
     private fun startProgressUpdate() {
@@ -236,18 +287,24 @@ class MusicPlayerManager @Inject constructor(
     }
 
     fun release() {
+        Log.d(TAG, "release() invoked")
         stopProgressUpdate()
         scope.cancel()
         audioDeviceCallback?.let { callback ->
             try {
+                Log.d(TAG, "Unregistering audio device callback")
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
                 audioManager.unregisterAudioDeviceCallback(callback)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Failed to unregister audio device callback: ${e.message}", e)
             }
         }
         audioDeviceCallback = null
         exoPlayer?.release()
         exoPlayer = null
+    }
+
+    companion object {
+        private const val TAG = "MusicPlayerManager"
     }
 }

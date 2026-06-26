@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -23,6 +24,7 @@ class MusicService : MediaSessionService() {
     lateinit var musicPlayerManager: MusicPlayerManager
 
     override fun onCreate() {
+        Log.d(TAG, "onCreate() service started")
         super.onCreate()
         createNotificationChannel()
 
@@ -39,14 +41,18 @@ class MusicService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .build()
+        Log.d(TAG, "MediaSession successfully built and set up")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        Log.d(TAG, "onGetSession: controller package=${controllerInfo.packageName}")
         return mediaSession
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "onDestroy() service stopping")
         mediaSession?.run {
+            Log.d(TAG, "Releasing MediaSession")
             release()
             mediaSession = null
         }
@@ -55,6 +61,7 @@ class MusicService : MediaSessionService() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Log.d(TAG, "Creating notification channel: $CHANNEL_ID")
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Music Playback",
@@ -68,6 +75,7 @@ class MusicService : MediaSessionService() {
     }
 
     companion object {
+        private const val TAG = "MusicService"
         private const val CHANNEL_ID = "metro_music_playback"
     }
 }
