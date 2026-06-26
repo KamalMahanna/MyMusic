@@ -4,6 +4,7 @@ import android.util.Log
 import com.metromusic.app.data.api.SaavnApi
 import com.metromusic.app.data.model.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,10 +13,30 @@ import javax.inject.Singleton
 class MusicRepository @Inject constructor(
     private val api: SaavnApi
 ) {
+    private suspend fun <T> runWithRetry(
+        maxRetries: Int = 5,
+        delayMs: Long = 1000L,
+        block: suspend () -> T
+    ): T {
+        var lastException: Exception? = null
+        for (attempt in 1..maxRetries) {
+            try {
+                return block()
+            } catch (e: Exception) {
+                lastException = e
+                Log.w(TAG, "Network attempt $attempt/$maxRetries failed: ${e.message}. Retrying in ${delayMs}ms...")
+                if (attempt < maxRetries) {
+                    delay(delayMs)
+                }
+            }
+        }
+        throw lastException ?: Exception("Unknown error during retry execution")
+    }
+
     suspend fun searchSongs(query: String, page: Int = 0, limit: Int = 50): Result<SearchSongResult> = withContext(Dispatchers.IO) {
         Log.d(TAG, "searchSongs(query='$query', page=$page, limit=$limit)")
         try {
-            val response = api.searchSongs(query, page, limit)
+            val response = runWithRetry { api.searchSongs(query, page, limit) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "searchSongs success: found ${response.data.results.size} songs")
                 Result.success(response.data.clean())
@@ -32,7 +53,7 @@ class MusicRepository @Inject constructor(
     suspend fun searchArtists(query: String, page: Int = 0, limit: Int = 50): Result<SearchArtistResult> = withContext(Dispatchers.IO) {
         Log.d(TAG, "searchArtists(query='$query', page=$page, limit=$limit)")
         try {
-            val response = api.searchArtists(query, page, limit)
+            val response = runWithRetry { api.searchArtists(query, page, limit) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "searchArtists success: found ${response.data.results.size} artists")
                 Result.success(response.data.clean())
@@ -49,7 +70,7 @@ class MusicRepository @Inject constructor(
     suspend fun getSongById(id: String): Result<Song> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getSongById(id='$id')")
         try {
-            val response = api.getSongById(id)
+            val response = runWithRetry { api.getSongById(id) }
             if (response.success && response.data != null && response.data.isNotEmpty()) {
                 Log.d(TAG, "getSongById success: loaded song name='${response.data.first().name}'")
                 Result.success(response.data.first().clean())
@@ -66,7 +87,7 @@ class MusicRepository @Inject constructor(
     suspend fun getSongSuggestions(songId: String, limit: Int = 20): Result<List<Song>> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getSongSuggestions(songId='$songId', limit=$limit)")
         try {
-            val response = api.getSongSuggestions(songId, limit)
+            val response = runWithRetry { api.getSongSuggestions(songId, limit) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getSongSuggestions success: loaded ${response.data.size} suggestions")
                 Result.success(response.data.map { it.clean() })
@@ -83,7 +104,7 @@ class MusicRepository @Inject constructor(
     suspend fun getArtistById(id: String): Result<ArtistDetail> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getArtistById(id='$id')")
         try {
-            val response = api.getArtistById(id)
+            val response = runWithRetry { api.getArtistById(id) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getArtistById success: loaded artist='${response.data.name}'")
                 Result.success(response.data.clean())
@@ -100,7 +121,7 @@ class MusicRepository @Inject constructor(
     suspend fun getAlbumById(id: String): Result<Album> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getAlbumById(id='$id')")
         try {
-            val response = api.getAlbumById(id)
+            val response = runWithRetry { api.getAlbumById(id) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getAlbumById success: loaded album='${response.data.name}'")
                 Result.success(response.data.clean())
@@ -117,7 +138,7 @@ class MusicRepository @Inject constructor(
     suspend fun getPlaylistById(id: String, limit: Int = 1000): Result<Playlist> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getPlaylistById(id='$id', limit=$limit)")
         try {
-            val response = api.getPlaylistById(id, limit = limit)
+            val response = runWithRetry { api.getPlaylistById(id, limit = limit) }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getPlaylistById success: loaded playlist='${response.data.name}', songs=${response.data.songs?.size ?: 0}")
                 Result.success(response.data.clean())
@@ -134,7 +155,7 @@ class MusicRepository @Inject constructor(
     suspend fun getModules(): Result<List<ModuleSection>> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getModules()")
         try {
-            val response = api.getModules()
+            val response = runWithRetry { api.getModules() }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getModules success: loaded ${response.data.size} sections")
                 Result.success(response.data.map { it.clean() })
@@ -151,7 +172,7 @@ class MusicRepository @Inject constructor(
     suspend fun getTrending(): Result<List<ModuleItem>> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getTrending()")
         try {
-            val response = api.getTrending()
+            val response = runWithRetry { api.getTrending() }
             if (response.success && response.data != null) {
                 Log.d(TAG, "getTrending success: loaded ${response.data.size} items")
                 Result.success(response.data.map { it.clean() })
