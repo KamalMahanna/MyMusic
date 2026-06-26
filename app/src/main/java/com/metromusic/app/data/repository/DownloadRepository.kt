@@ -44,19 +44,26 @@ class DownloadRepository @Inject constructor(
         return targetFile
     }
 
-    fun isSongDownloaded(song: Song): Boolean {
+    fun getReadableFileForSong(song: Song): File? {
         val primaryFile = getFileForSong(song)
         if (primaryFile.exists() && primaryFile.canRead()) {
-            Log.d(TAG, "isSongDownloaded: Song '${song.name}' downloaded (.m4a)")
-            return true
+            return primaryFile
         }
         // Backward compatibility: check old .mp3 extension
         val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val mp3File = File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3")
-        val mp3Exists = mp3File.exists() && mp3File.canRead()
-        Log.d(TAG, "isSongDownloaded: Checking .mp3 at '${mp3File.absolutePath}', exists=$mp3Exists")
-        return mp3Exists
+        if (mp3File.exists() && mp3File.canRead()) {
+            return mp3File
+        }
+        return null
+    }
+
+    fun isSongDownloaded(song: Song): Boolean {
+        val readableFile = getReadableFileForSong(song)
+        val isDownloaded = readableFile != null
+        Log.d(TAG, "isSongDownloaded: Song '${song.name}' downloaded=$isDownloaded (path=${readableFile?.absolutePath})")
+        return isDownloaded
     }
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
@@ -141,8 +148,8 @@ class DownloadRepository @Inject constructor(
     }
 
     fun getCachedArtworkForSong(song: Song): File? {
-        val file = getFileForSong(song)
-        if (!file.exists() || !file.canRead()) {
+        val file = getReadableFileForSong(song)
+        if (file == null) {
             Log.d(TAG, "getCachedArtworkForSong: Song file does not exist or is unreadable")
             return null
         }

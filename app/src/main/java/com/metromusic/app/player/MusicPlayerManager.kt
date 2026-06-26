@@ -135,20 +135,21 @@ class MusicPlayerManager @Inject constructor(
             Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
         }
 
-        val file = downloadRepository.getFileForSong(song)
+        val readableFile = downloadRepository.getReadableFileForSong(song)
         
         val uri = when {
             song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
                 val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
-                if (java.io.File(filePath).exists()) {
+                val customFile = java.io.File(filePath)
+                if (customFile.exists() && customFile.canRead()) {
                     Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
-                    if (song.url.startsWith("/")) android.net.Uri.fromFile(java.io.File(song.url)).toString()
+                    if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
                     else song.url
                 } else {
-                    Log.w(TAG, "Local file from song.url does not exist: $filePath. Falling back to other sources.")
-                    if (file.exists()) {
-                        Log.d(TAG, "Found downloaded song file at ${file.absolutePath}")
-                        android.net.Uri.fromFile(file).toString()
+                    Log.w(TAG, "Local file from song.url does not exist or is unreadable: $filePath. Falling back to other sources.")
+                    if (readableFile != null) {
+                        Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
+                        android.net.Uri.fromFile(readableFile).toString()
                     } else {
                         val dlUrl = song.highQualityDownloadUrl
                         Log.d(TAG, "Using high quality download URL: $dlUrl")
@@ -156,9 +157,9 @@ class MusicPlayerManager @Inject constructor(
                     }
                 }
             }
-            file.exists() -> {
-                Log.d(TAG, "Found downloaded song file at ${file.absolutePath}")
-                android.net.Uri.fromFile(file).toString()
+            readableFile != null -> {
+                Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
+                android.net.Uri.fromFile(readableFile).toString()
             }
             else -> {
                 val dlUrl = song.highQualityDownloadUrl
