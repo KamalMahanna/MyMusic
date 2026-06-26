@@ -31,6 +31,10 @@ fun MiniPlayer(
     val playbackState by viewModel.playbackState.collectAsState()
     val song = playbackState.currentSong ?: return
 
+    val progress = if (playbackState.duration > 0) {
+        playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+    } else 0f
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -39,79 +43,72 @@ fun MiniPlayer(
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onPlayerClick() }
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
+        // Progress background overlay
+        Box(
+            modifier = Modifier.matchParentSize()
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+        ) {
+            AsyncImage(
+                model = song.highQualityImageUrl,
+                contentDescription = "Artwork",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                AsyncImage(
-                    model = song.highQualityImageUrl,
-                    contentDescription = "Artwork",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                Text(
+                    text = song.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = song.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.primaryArtistNames,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                IconButton(
-                    onClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause"
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(4.dp))
-                
-                IconButton(
-                    onClick = { viewModel.playNext() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next"
-                    )
-                }
+                Text(
+                    text = song.primaryArtistNames,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             
-            val progress = if (playbackState.duration > 0) {
-                playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
-            } else 0f
+            Spacer(modifier = Modifier.width(12.dp))
             
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-            )
+            IconButton(
+                onClick = { viewModel.togglePlayPause() }
+            ) {
+                Icon(
+                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = "Play/Pause"
+                )
+            }
+            
+            IconButton(
+                onClick = { viewModel.playNext() }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "Next"
+                )
+            }
         }
     }
 }
