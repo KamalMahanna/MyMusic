@@ -10,16 +10,12 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-
-    private const val BASE_URL = "https://jiosaavn-api.jiosaavnk.workers.dev/"
 
     @Provides
     @Singleton
@@ -37,13 +33,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(moshi: Moshi, okHttpClient: OkHttpClient): Retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create(moshi))
-        .build()
-
-    @Provides
-    @Singleton
-    fun provideSaavnApi(retrofit: Retrofit): SaavnApi = retrofit.create(SaavnApi::class.java)
+    fun provideSaavnApi(okHttpClient: OkHttpClient, moshi: Moshi): SaavnApi = 
+        com.metromusic.app.data.api.SaavnApiImpl(okHttpClient, moshi)
 }
