@@ -61,46 +61,21 @@ fun MiniPlayer(
                     .height(48.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Text(
+                    text = song.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = song.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.primaryArtistNames,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    
-                    IconButton(
-                        onClick = { viewModel.togglePlayPause() },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause"
-                        )
-                    }
-                    
-                    IconButton(
-                        onClick = { viewModel.playNext() },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Next"
-                        )
-                    }
-                }
+                )
+                Text(
+                    text = song.primaryArtistNames,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 
                 val progress = if (playbackState.duration > 0) {
                     playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
@@ -112,6 +87,35 @@ fun MiniPlayer(
                         .fillMaxWidth()
                         .height(2.dp)
                 )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(
+                    onClick = { viewModel.togglePlayPause() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play/Pause"
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                IconButton(
+                    onClick = { viewModel.playNext() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next"
+                    )
+                }
             }
         }
     }
