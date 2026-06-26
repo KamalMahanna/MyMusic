@@ -56,7 +56,10 @@ fun MiniPlayer(
             Spacer(modifier = Modifier.width(12.dp))
             
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -78,22 +81,26 @@ fun MiniPlayer(
                         )
                     }
                     
-                    IconButton(onClick = { viewModel.togglePlayPause() }) {
+                    IconButton(
+                        onClick = { viewModel.togglePlayPause() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
                             imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = "Play/Pause"
                         )
                     }
                     
-                    IconButton(onClick = { viewModel.playNext() }) {
+                    IconButton(
+                        onClick = { viewModel.playNext() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.SkipNext,
                             contentDescription = "Next"
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(2.dp))
                 
                 val progress = if (playbackState.duration > 0) {
                     playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
@@ -103,7 +110,6 @@ fun MiniPlayer(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(end = 24.dp)
                         .height(2.dp)
                 )
             }
