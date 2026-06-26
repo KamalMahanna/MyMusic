@@ -3,8 +3,10 @@ package com.metromusic.app.ui.screens.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.metromusic.app.data.model.Album
 import com.metromusic.app.data.model.ModuleItem
 import com.metromusic.app.data.model.ModuleSection
+import com.metromusic.app.data.model.Playlist
 import com.metromusic.app.data.repository.MusicRepository
 import com.metromusic.app.player.MusicPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +20,9 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val sections: List<ModuleSection> = emptyList(),
     val error: String? = null,
-    val isItemLoading: Boolean = false
+    val isItemLoading: Boolean = false,
+    val selectedPlaylist: Playlist? = null,
+    val selectedAlbum: Album? = null
 )
 
 @HiltViewModel
@@ -70,12 +74,7 @@ class HomeViewModel @Inject constructor(
                     "playlist" -> {
                         val result = musicRepository.getPlaylistById(item.id)
                         result.onSuccess { playlist ->
-                            val songs = playlist.songs
-                            if (!songs.isNullOrEmpty()) {
-                                musicPlayerManager.playSongFromQueue(songs, 0)
-                            } else {
-                                _uiState.value = _uiState.value.copy(error = "Playlist is empty")
-                            }
+                            _uiState.value = _uiState.value.copy(selectedPlaylist = playlist)
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load playlist", e)
                             _uiState.value = _uiState.value.copy(error = "Failed to load playlist: ${e.message}")
@@ -84,12 +83,7 @@ class HomeViewModel @Inject constructor(
                     "album" -> {
                         val result = musicRepository.getAlbumById(item.id)
                         result.onSuccess { album ->
-                            val songs = album.songs
-                            if (!songs.isNullOrEmpty()) {
-                                musicPlayerManager.playSongFromQueue(songs, 0)
-                            } else {
-                                _uiState.value = _uiState.value.copy(error = "Album is empty")
-                            }
+                            _uiState.value = _uiState.value.copy(selectedAlbum = album)
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load album", e)
                             _uiState.value = _uiState.value.copy(error = "Failed to load album: ${e.message}")
@@ -103,6 +97,14 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isItemLoading = false)
             }
         }
+    }
+
+    fun clearSelectedPlaylist() {
+        _uiState.value = _uiState.value.copy(selectedPlaylist = null)
+    }
+
+    fun clearSelectedAlbum() {
+        _uiState.value = _uiState.value.copy(selectedAlbum = null)
     }
 
     companion object {
