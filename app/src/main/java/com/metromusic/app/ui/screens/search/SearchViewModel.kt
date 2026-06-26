@@ -87,9 +87,16 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.getArtistById(artistId)
                 .onSuccess { detail ->
+                    // Deduplicate topSongs so the UI list and the queue indices always match.
+                    // Without this, clicking a duplicate item plays the wrong song because
+                    // QueueManager deduplicates on setQueue() but the displayed list still has
+                    // the originals — causing an index mismatch.
+                    val deduplicatedTopSongs = detail.topSongs
+                        ?.distinctBy { song -> song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim() }
+                    val cleanDetail = if (deduplicatedTopSongs != null) detail.copy(topSongs = deduplicatedTopSongs) else detail
                     _uiState.value = _uiState.value.copy(
                         isArtistDetailLoading = false,
-                        selectedArtistDetail = detail
+                        selectedArtistDetail = cleanDetail
                     )
                 }
                 .onFailure { e ->
