@@ -37,6 +37,7 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by playerViewModel.downloadState.collectAsState()
+    val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -100,7 +101,7 @@ fun SearchScreen(
                 if (uiState.filter == SearchFilter.SONGS) {
                     items(uiState.songs) { song ->
                         val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                        val isDownloaded = playerViewModel.isSongDownloaded(song)
+                        val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
                         SongListItem(
                             song = song,
                             onClick = { playerViewModel.playSongFromList(uiState.songs, uiState.songs.indexOf(song)) },
@@ -218,7 +219,7 @@ fun SearchScreen(
                     ) {
                         itemsIndexed(topSongs) { index, song ->
                             val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                            val isDownloaded = playerViewModel.isSongDownloaded(song)
+                            val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
                             SongListItem(
                                 song = song,
                                 onClick = { playerViewModel.playSongFromList(topSongs, index) },

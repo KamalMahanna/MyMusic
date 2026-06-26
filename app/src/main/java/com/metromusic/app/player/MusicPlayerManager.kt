@@ -139,9 +139,22 @@ class MusicPlayerManager @Inject constructor(
         
         val uri = when {
             song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
-                Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
-                if (song.url.startsWith("/")) android.net.Uri.fromFile(java.io.File(song.url)).toString()
-                else song.url
+                val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
+                if (java.io.File(filePath).exists()) {
+                    Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
+                    if (song.url.startsWith("/")) android.net.Uri.fromFile(java.io.File(song.url)).toString()
+                    else song.url
+                } else {
+                    Log.w(TAG, "Local file from song.url does not exist: $filePath. Falling back to other sources.")
+                    if (file.exists()) {
+                        Log.d(TAG, "Found downloaded song file at ${file.absolutePath}")
+                        android.net.Uri.fromFile(file).toString()
+                    } else {
+                        val dlUrl = song.highQualityDownloadUrl
+                        Log.d(TAG, "Using high quality download URL: $dlUrl")
+                        dlUrl ?: return
+                    }
+                }
             }
             file.exists() -> {
                 Log.d(TAG, "Found downloaded song file at ${file.absolutePath}")

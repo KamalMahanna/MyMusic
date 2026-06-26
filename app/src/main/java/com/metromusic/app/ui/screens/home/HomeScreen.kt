@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by playerViewModel.downloadState.collectAsState()
+    val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.isLoading) {
@@ -173,7 +175,7 @@ fun HomeScreen(
                         ) {
                             itemsIndexed(songs) { index, song ->
                                 val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                                val isDownloaded = playerViewModel.isSongDownloaded(song)
+                                val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
                                 SongListItem(
                                     song = song,
                                     onClick = { playerViewModel.playSongFromList(songs, index) },
@@ -252,7 +254,7 @@ fun HomeScreen(
                         ) {
                             itemsIndexed(songs) { index, song ->
                                 val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                                val isDownloaded = playerViewModel.isSongDownloaded(song)
+                                val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
                                 SongListItem(
                                     song = song,
                                     onClick = { playerViewModel.playSongFromList(songs, index) },
