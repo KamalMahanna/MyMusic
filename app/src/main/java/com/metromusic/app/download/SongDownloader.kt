@@ -71,8 +71,8 @@ class SongDownloader @Inject constructor(
         }
         val file = downloadRepository.getFileForSong(song)
 
-        if (file.exists()) {
-            Log.d(TAG, "downloadSong: song already downloaded, file exists at '${file.absolutePath}'")
+        if (file.exists() && file.canRead()) {
+            Log.d(TAG, "downloadSong: song already downloaded and readable, file exists at '${file.absolutePath}'")
             return@withContext true
         }
 

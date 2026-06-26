@@ -46,7 +46,7 @@ class DownloadRepository @Inject constructor(
 
     fun isSongDownloaded(song: Song): Boolean {
         val primaryFile = getFileForSong(song)
-        if (primaryFile.exists()) {
+        if (primaryFile.exists() && primaryFile.canRead()) {
             Log.d(TAG, "isSongDownloaded: Song '${song.name}' downloaded (.m4a)")
             return true
         }
@@ -54,7 +54,7 @@ class DownloadRepository @Inject constructor(
         val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
         val mp3File = File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3")
-        val mp3Exists = mp3File.exists()
+        val mp3Exists = mp3File.exists() && mp3File.canRead()
         Log.d(TAG, "isSongDownloaded: Checking .mp3 at '${mp3File.absolutePath}', exists=$mp3Exists")
         return mp3Exists
     }
@@ -70,10 +70,10 @@ class DownloadRepository @Inject constructor(
 
         val files = dir.listFiles()?.filter {
             val ext = it.extension.lowercase()
-            ext == "m4a" || ext == "mp3" || ext == "mp4"
+            (ext == "m4a" || ext == "mp3" || ext == "mp4") && it.canRead()
         } ?: emptyList()
 
-        Log.d(TAG, "refreshDownloadedSongs: Found ${files.size} matching audio files")
+        Log.d(TAG, "refreshDownloadedSongs: Found ${files.size} readable matching audio files")
 
         val songs = files.map { file ->
             val retriever = android.media.MediaMetadataRetriever()
@@ -142,12 +142,12 @@ class DownloadRepository @Inject constructor(
 
     fun getCachedArtworkForSong(song: Song): File? {
         val file = getFileForSong(song)
-        if (!file.exists()) {
-            Log.d(TAG, "getCachedArtworkForSong: Song file does not exist, no artwork cached")
+        if (!file.exists() || !file.canRead()) {
+            Log.d(TAG, "getCachedArtworkForSong: Song file does not exist or is unreadable")
             return null
         }
         val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
-        val cacheExists = cacheFile.exists()
+        val cacheExists = cacheFile.exists() && cacheFile.canRead()
         Log.d(TAG, "getCachedArtworkForSong: Checking cached artwork at '${cacheFile.absolutePath}', exists=$cacheExists")
         return if (cacheExists) cacheFile else null
     }
