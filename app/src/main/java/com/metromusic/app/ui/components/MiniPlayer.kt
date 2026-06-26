@@ -58,20 +58,12 @@ fun MiniPlayer(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp),
+                    .height(36.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = song.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = song.primaryArtistNames,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
@@ -89,7 +81,7 @@ fun MiniPlayer(
                 )
             }
             
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -97,23 +89,25 @@ fun MiniPlayer(
             ) {
                 IconButton(
                     onClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause"
+                        contentDescription = "Play/Pause",
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 
                 IconButton(
                     onClick = { viewModel.playNext() },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next"
+                        contentDescription = "Next",
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
