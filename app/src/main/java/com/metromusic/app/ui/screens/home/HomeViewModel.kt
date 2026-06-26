@@ -71,7 +71,7 @@ class HomeViewModel @Inject constructor(
                             _uiState.value = _uiState.value.copy(error = "Failed to load song: ${e.message}")
                         }
                     }
-                    "playlist" -> {
+                    "playlist", "channel" -> {
                         val result = musicRepository.getPlaylistById(item.id)
                         result.onSuccess { playlist ->
                             _uiState.value = _uiState.value.copy(selectedPlaylist = playlist)
