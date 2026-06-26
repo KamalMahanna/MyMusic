@@ -14,8 +14,12 @@ android {
         applicationId = "com.metromusic.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        
+        val envVersionCode = System.getenv("APP_VERSION_CODE")
+        versionCode = envVersionCode?.toIntOrNull() ?: 1
+        
+        val envVersionName = System.getenv("APP_VERSION_NAME")
+        versionName = envVersionName ?: "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

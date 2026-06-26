@@ -3,10 +3,6 @@ name: Android CI/CD
 on:
   push:
     branches: [ "main" ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
   build:
@@ -25,22 +21,36 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
+    - name: Generate Version Info
+      id: version
+      run: |
+        # Format date as YY.MM.DD
+        DATE=$(date +'%y.%m.%d')
+        # App version name is YY.MM.DD.RUN_NUMBER to make it unique and sequential
+        VERSION_NAME="$DATE.${{ github.run_number }}"
+        TAG_NAME="v$VERSION_NAME"
+        echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
     - name: Grant Execute Permission to Gradlew
       run: chmod +x gradlew
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug
+      env:
+        APP_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        APP_VERSION_CODE: ${{ github.run_number }}
 
-    - name: Upload Debug APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: MetroMusic-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
-
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ steps.version.outputs.tag_name }}
+        name: Release ${{ steps.version.outputs.version_name }}
+        body: |
+          Automated release generated on push to main branch.
+          
+          **Version Name:** `${{ steps.version.outputs.version_name }}`
+          **Version Code:** `${{ github.run_number }}`
         files: app/build/outputs/apk/debug/app-debug.apk
         draft: false
         prerelease: false
