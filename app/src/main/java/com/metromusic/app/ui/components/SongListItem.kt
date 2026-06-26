@@ -1,5 +1,6 @@
 package com.metromusic.app.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.metromusic.app.data.model.Song
 
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.filled.VolumeUp
+
 @Composable
 fun SongListItem(
     song: Song,
@@ -24,11 +28,17 @@ fun SongListItem(
     onDownloadClick: () -> Unit,
     isDownloaded: Boolean,
     isDownloading: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPlaying: Boolean = false
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                else androidx.compose.ui.graphics.Color.Transparent
+            )
             .clickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -48,6 +58,7 @@ fun SongListItem(
             Text(
                 text = song.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -62,7 +73,14 @@ fun SongListItem(
         
         Spacer(modifier = Modifier.width(8.dp))
         
-        if (isDownloading) {
+        if (isPlaying) {
+            Icon(
+                imageVector = Icons.Default.VolumeUp,
+                contentDescription = "Playing",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(12.dp)
+            )
+        } else if (isDownloading) {
             CircularProgressIndicator(modifier = Modifier.size(24.dp))
         } else {
             IconButton(onClick = onDownloadClick) {

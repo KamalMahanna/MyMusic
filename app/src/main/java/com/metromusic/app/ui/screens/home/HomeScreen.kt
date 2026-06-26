@@ -34,6 +34,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val downloadState by playerViewModel.downloadState.collectAsState()
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
+    val playbackState by playerViewModel.playbackState.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.isLoading) {
@@ -176,12 +177,14 @@ fun HomeScreen(
                             itemsIndexed(songs) { index, song ->
                                 val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
                                 val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
+                                val isPlaying = playbackState.currentSong?.id == song.id
                                 SongListItem(
                                     song = song,
                                     onClick = { playerViewModel.playSongFromList(songs, index) },
                                     onDownloadClick = { playerViewModel.downloadSong(song) },
                                     isDownloaded = isDownloaded,
-                                    isDownloading = isDownloading
+                                    isDownloading = isDownloading,
+                                    isPlaying = isPlaying
                                 )
                             }
                         }
@@ -255,12 +258,14 @@ fun HomeScreen(
                             itemsIndexed(songs) { index, song ->
                                 val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
                                 val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
+                                val isPlaying = playbackState.currentSong?.id == song.id
                                 SongListItem(
                                     song = song,
                                     onClick = { playerViewModel.playSongFromList(songs, index) },
                                     onDownloadClick = { playerViewModel.downloadSong(song) },
                                     isDownloaded = isDownloaded,
-                                    isDownloading = isDownloading
+                                    isDownloading = isDownloading,
+                                    isPlaying = isPlaying
                                 )
                             }
                         }
