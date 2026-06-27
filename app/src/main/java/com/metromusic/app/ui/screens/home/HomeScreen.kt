@@ -141,8 +141,7 @@ fun HomeScreen(
         if (uiState.selectedPlaylist != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedPlaylist() },
-                sheetState = playlistSheetState,
-                modifier = Modifier.fillMaxHeight(0.8f)
+                sheetState = playlistSheetState
             ) {
                 PlaylistSheetContent(
                     playlist = uiState.selectedPlaylist!!,
@@ -158,8 +157,7 @@ fun HomeScreen(
         if (uiState.selectedAlbum != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedAlbum() },
-                sheetState = albumSheetState,
-                modifier = Modifier.fillMaxHeight(0.8f)
+                sheetState = albumSheetState
             ) {
                 AlbumSheetContent(
                     album = uiState.selectedAlbum!!,
@@ -192,7 +190,7 @@ private fun PlaylistSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .fillMaxHeight(0.8f)
             .padding(horizontal = 16.dp)
     ) {
         Row(
@@ -297,7 +295,7 @@ private fun AlbumSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .fillMaxHeight(0.8f)
             .padding(horizontal = 16.dp)
     ) {
         Row(
