@@ -181,7 +181,7 @@ fun HomeScreen(
  * This prevents the entire home LazyColumn from recomposing every 500ms.
  */
 @Composable
-private fun PlaylistSheetContent(
+internal fun PlaylistSheetContent(
     playlist: com.metromusic.app.data.model.Playlist,
     playerViewModel: PlayerViewModel,
     onPlaySong: () -> Unit
@@ -300,7 +300,7 @@ private fun PlaylistSheetContent(
  * Extracted album sheet content — same rationale as PlaylistSheetContent.
  */
 @Composable
-private fun AlbumSheetContent(
+internal fun AlbumSheetContent(
     album: com.metromusic.app.data.model.Album,
     playerViewModel: PlayerViewModel,
     onPlaySong: () -> Unit

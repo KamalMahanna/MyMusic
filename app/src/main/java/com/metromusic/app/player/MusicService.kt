@@ -88,6 +88,16 @@ class MusicService : MediaSessionService() {
         return mediaSession
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(TAG, "onTaskRemoved() called. App swiped away from recent tasks.")
+        val player = mediaSession?.player
+        if (player != null) {
+            player.pause()
+        }
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() service stopping")
         mediaSession?.run {

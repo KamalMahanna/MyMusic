@@ -1,8 +1,11 @@
 package com.metromusic.app.player
 
+import android.content.Context
 import android.util.Log
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.data.repository.MusicRepository
+import com.squareup.moshi.Moshi
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +14,9 @@ import javax.inject.Singleton
 
 @Singleton
 class QueueManager @Inject constructor(
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val moshi: Moshi,
+    @ApplicationContext private val context: Context
 ) {
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
@@ -23,12 +28,56 @@ class QueueManager @Inject constructor(
     private val playedKeys = mutableSetOf<Pair<String, String>>()
     private var isLoadingSuggestions = false
 
+    private val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
+
     val currentSong: Song?
         get() {
             val idx = _currentIndex.value
             val q = _queue.value
             return if (idx in q.indices) q[idx] else null
         }
+
+    init {
+        restoreState()
+    }
+
+    private fun saveState() {
+        try {
+            val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
+            val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
+            sharedPreferences.edit()
+                .putString("KEY_QUEUE", json)
+                .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
+                .apply()
+            Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save queue state", e)
+        }
+    }
+
+    private fun restoreState() {
+        try {
+            val json = sharedPreferences.getString("KEY_QUEUE", null)
+            val index = sharedPreferences.getInt("KEY_CURRENT_INDEX", -1)
+            if (!json.isNullOrEmpty()) {
+                val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
+                val restored: List<Song>? = moshi.adapter<List<Song>>(listType).fromJson(json)
+                if (!restored.isNullOrEmpty()) {
+                    _queue.value = restored
+                    _currentIndex.value = index
+                    playedSongIds.clear()
+                    playedKeys.clear()
+                    restored.forEach {
+                        playedSongIds.add(it.id)
+                        playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+                    }
+                    Log.d(TAG, "restored state success: restored queue of size ${restored.size} at index $index")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore queue state", e)
+        }
+    }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0) {
         Log.d(TAG, "setQueue: input size=${songs.size}, startIndex=$startIndex")
@@ -59,6 +108,7 @@ class QueueManager @Inject constructor(
         }
         _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, uniqueSongs.size - 1)
         Log.d(TAG, "setQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
+        saveState()
     }
 
     fun addToQueue(song: Song) {
@@ -68,6 +118,7 @@ class QueueManager @Inject constructor(
             _queue.value = _queue.value + song
             playedSongIds.add(song.id)
             playedKeys.add(key)
+            saveState()
         } else {
             Log.d(TAG, "addToQueue: skipped duplicate song='${song.name}'")
         }
@@ -94,6 +145,7 @@ class QueueManager @Inject constructor(
                 playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
             }
             Log.d(TAG, "addToQueue (bulk): new total queue size=${_queue.value.size}")
+            saveState()
         }
     }
 
@@ -103,6 +155,7 @@ class QueueManager @Inject constructor(
         return if (nextIndex < _queue.value.size) {
             _currentIndex.value = nextIndex
             Log.d(TAG, "moveToNext: moved to '${_queue.value[nextIndex].name}'")
+            saveState()
             _queue.value[nextIndex]
         } else {
             Log.d(TAG, "moveToNext: already at end of queue")
@@ -116,6 +169,7 @@ class QueueManager @Inject constructor(
         return if (prevIndex >= 0) {
             _currentIndex.value = prevIndex
             Log.d(TAG, "moveToPrevious: moved to '${_queue.value[prevIndex].name}'")
+            saveState()
             _queue.value[prevIndex]
         } else {
             Log.d(TAG, "moveToPrevious: already at beginning of queue")
@@ -128,6 +182,7 @@ class QueueManager @Inject constructor(
         return if (index in _queue.value.indices) {
             _currentIndex.value = index
             Log.d(TAG, "jumpTo: moved to '${_queue.value[index].name}'")
+            saveState()
             _queue.value[index]
         } else {
             Log.w(TAG, "jumpTo: index out of bounds")
@@ -173,6 +228,7 @@ class QueueManager @Inject constructor(
         _currentIndex.value = -1
         playedSongIds.clear()
         playedKeys.clear()
+        saveState()
     }
 
     fun removeAt(index: Int) {
@@ -190,6 +246,7 @@ class QueueManager @Inject constructor(
             } else if (index == _currentIndex.value) {
                 Log.d(TAG, "removeAt: removed current song, index remains ${_currentIndex.value}")
             }
+            saveState()
         } else {
             Log.w(TAG, "removeAt: index out of bounds")
         }

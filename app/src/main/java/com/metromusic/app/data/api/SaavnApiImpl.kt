@@ -445,6 +445,49 @@ class SaavnApiImpl @Inject constructor(
         }
     }
 
+    override suspend fun searchAlbums(
+        query: String,
+        page: Int,
+        limit: Int
+    ): ApiResponse<SearchAlbumResult> {
+        return try {
+            val json = useFetch(
+                endpoint = "search.getAlbumResults",
+                params = mapOf("q" to query, "p" to page.toString(), "n" to limit.toString())
+            )
+            val map = parseJsonToMap(json) ?: return ApiResponse(false, null)
+            val total = (map["total"] as? Number)?.toInt() ?: ((map["total"] as? String)?.toIntOrNull() ?: 0)
+            val start = (map["start"] as? Number)?.toInt() ?: ((map["start"] as? String)?.toIntOrNull() ?: 0)
+            val resultsList = (map["results"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+            val results = resultsList.mapNotNull { parseAlbum(it) }.take(limit)
+            ApiResponse(true, SearchAlbumResult(total = total, start = start, results = results))
+        } catch (e: Exception) {
+            ApiResponse(false, null)
+        }
+    }
+
+    override suspend fun searchPlaylists(
+        query: String,
+        page: Int,
+        limit: Int
+    ): ApiResponse<SearchPlaylistResult> {
+        return try {
+            val json = useFetch(
+                endpoint = "search.getPlaylistResults",
+                params = mapOf("q" to query, "p" to page.toString(), "n" to limit.toString())
+            )
+            val map = parseJsonToMap(json) ?: return ApiResponse(false, null)
+            val total = (map["total"] as? Number)?.toInt() ?: ((map["total"] as? String)?.toIntOrNull() ?: 0)
+            val start = (map["start"] as? Number)?.toInt() ?: ((map["start"] as? String)?.toIntOrNull() ?: 0)
+            val resultsList = (map["results"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+            val results = resultsList.mapNotNull { parsePlaylist(it) }.take(limit)
+            ApiResponse(true, SearchPlaylistResult(total = total, start = start, results = results))
+        } catch (e: Exception) {
+            ApiResponse(false, null)
+        }
+    }
+
+
     override suspend fun getSongById(id: String): ApiResponse<List<Song>> {
         return try {
             val json = useFetch(

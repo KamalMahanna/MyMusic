@@ -115,6 +115,22 @@ data class SearchArtistResult(
 
 @Immutable
 @JsonClass(generateAdapter = true)
+data class SearchAlbumResult(
+    val total: Int = 0,
+    val start: Int = 0,
+    val results: List<Album> = emptyList()
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class SearchPlaylistResult(
+    val total: Int = 0,
+    val start: Int = 0,
+    val results: List<Playlist> = emptyList()
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
 data class SearchArtist(
     val id: String = "",
     val name: String = "",
@@ -349,6 +365,18 @@ fun SearchArtist.clean(): SearchArtist {
 }
 
 fun SearchArtistResult.clean(): SearchArtistResult {
+    return this.copy(
+        results = results.map { it.clean() }
+    )
+}
+
+fun SearchAlbumResult.clean(): SearchAlbumResult {
+    return this.copy(
+        results = results.map { it.clean() }
+    )
+}
+
+fun SearchPlaylistResult.clean(): SearchPlaylistResult {
     return this.copy(
         results = results.map { it.clean() }
     )

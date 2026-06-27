@@ -20,6 +20,21 @@ interface SaavnApi {
         @Query("limit") limit: Int = 20
     ): ApiResponse<SearchArtistResult>
 
+    @GET("api/search/albums")
+    suspend fun searchAlbums(
+        @Query("query") query: String,
+        @Query("page") page: Int = 0,
+        @Query("limit") limit: Int = 20
+    ): ApiResponse<SearchAlbumResult>
+
+    @GET("api/search/playlists")
+    suspend fun searchPlaylists(
+        @Query("query") query: String,
+        @Query("page") page: Int = 0,
+        @Query("limit") limit: Int = 20
+    ): ApiResponse<SearchPlaylistResult>
+
+
     @GET("api/songs/{id}")
     suspend fun getSongById(@Path("id") id: String): ApiResponse<List<Song>>
 

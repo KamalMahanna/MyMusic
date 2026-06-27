@@ -67,6 +67,41 @@ class MusicRepository @Inject constructor(
         }
     }
 
+    suspend fun searchAlbums(query: String, page: Int = 0, limit: Int = 50): Result<SearchAlbumResult> = withContext(Dispatchers.IO) {
+        Log.d(TAG, "searchAlbums(query='$query', page=$page, limit=$limit)")
+        try {
+            val response = runWithRetry { api.searchAlbums(query, page, limit) }
+            if (response.success && response.data != null) {
+                Log.d(TAG, "searchAlbums success: found ${response.data.results.size} albums")
+                Result.success(response.data.clean())
+            } else {
+                Log.e(TAG, "searchAlbums failed: success=${response.success}, data is null: ${response.data == null}")
+                Result.failure(Exception("Album search failed"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "searchAlbums error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchPlaylists(query: String, page: Int = 0, limit: Int = 50): Result<SearchPlaylistResult> = withContext(Dispatchers.IO) {
+        Log.d(TAG, "searchPlaylists(query='$query', page=$page, limit=$limit)")
+        try {
+            val response = runWithRetry { api.searchPlaylists(query, page, limit) }
+            if (response.success && response.data != null) {
+                Log.d(TAG, "searchPlaylists success: found ${response.data.results.size} playlists")
+                Result.success(response.data.clean())
+            } else {
+                Log.e(TAG, "searchPlaylists failed: success=${response.success}, data is null: ${response.data == null}")
+                Result.failure(Exception("Playlist search failed"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "searchPlaylists error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+
     suspend fun getSongById(id: String): Result<Song> = withContext(Dispatchers.IO) {
         Log.d(TAG, "getSongById(id='$id')")
         try {

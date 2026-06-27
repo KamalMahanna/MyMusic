@@ -132,6 +132,7 @@ class MusicPlayerManager @Inject constructor(
                 }
                 audioManager.registerAudioDeviceCallback(callback, null)
                 audioDeviceCallback = callback
+                restoreLastPlayedSong(player)
             }
     }
 
@@ -389,6 +390,9 @@ class MusicPlayerManager @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
             }
+            if (player.playbackState == Player.STATE_IDLE) {
+                player.prepare()
+            }
             player.play()
         }
     }
@@ -397,6 +401,14 @@ class MusicPlayerManager @Inject constructor(
         Log.d(TAG, "seekTo: position=$position")
         exoPlayer?.seekTo(position)
         _playbackState.value = _playbackState.value.copy(currentPosition = position)
+        try {
+            val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
+            sharedPreferences.edit()
+                .putLong("KEY_SEEK_POSITION", position)
+                .apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save seek position", e)
+        }
     }
 
     fun jumpToQueueIndex(index: Int) {
@@ -414,10 +426,19 @@ class MusicPlayerManager @Inject constructor(
         progressJob = scope.launch {
             while (isActive) {
                 exoPlayer?.let { player ->
+                    val pos = player.currentPosition.coerceAtLeast(0)
                     _playbackState.value = _playbackState.value.copy(
-                        currentPosition = player.currentPosition.coerceAtLeast(0),
+                        currentPosition = pos,
                         duration = player.duration.coerceAtLeast(0)
                     )
+                    try {
+                        val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
+                        sharedPreferences.edit()
+                            .putLong("KEY_SEEK_POSITION", pos)
+                            .apply()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to save progress seek position", e)
+                    }
                 }
                 delay(500)
             }
@@ -445,6 +466,119 @@ class MusicPlayerManager @Inject constructor(
         audioDeviceCallback = null
         exoPlayer?.release()
         exoPlayer = null
+    }
+
+    private fun restoreLastPlayedSong(player: ExoPlayer) {
+        val lastSong = queueManager.currentSong
+        if (lastSong != null) {
+            Log.d(TAG, "restoreLastPlayedSong: found song '${lastSong.name}' in queue manager, restoring to ExoPlayer")
+            val readableFile = downloadRepository.getReadableFileForSong(lastSong)
+            val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(lastSong) else null
+            
+            val uri = when {
+                lastSong.url.isNotEmpty() && (lastSong.url.startsWith("/") || lastSong.url.startsWith("file:")) -> {
+                    val filePath = if (lastSong.url.startsWith("file://")) lastSong.url.substring(7) else lastSong.url
+                    val customFile = java.io.File(filePath)
+                    if (customFile.exists() && customFile.canRead()) {
+                        if (lastSong.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
+                        else lastSong.url
+                    } else {
+                        when {
+                            readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
+                            cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
+                            else -> lastSong.highQualityDownloadUrl
+                        }
+                    }
+                }
+                readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
+                cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
+                else -> lastSong.highQualityDownloadUrl
+            }
+
+            if (uri != null) {
+                val localArtworkFile = downloadRepository.getCachedArtworkForSong(lastSong)
+                val artworkUri = if (localArtworkFile != null) {
+                    android.net.Uri.fromFile(localArtworkFile)
+                } else {
+                    lastSong.highQualityImageUrl?.let { android.net.Uri.parse(it) }
+                }
+
+                val mediaItem = MediaItem.Builder()
+                    .setUri(uri)
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(lastSong.name)
+                            .setArtist(lastSong.primaryArtistNames)
+                            .setAlbumTitle(lastSong.album.name)
+                            .setArtworkUri(artworkUri)
+                            .build()
+                    )
+                    .build()
+
+                player.setMediaItem(mediaItem)
+                
+                val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
+                val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
+                if (savedPos > 0) {
+                    player.seekTo(savedPos)
+                }
+                player.prepare()
+
+                _playbackState.value = PlaybackState(
+                    currentSong = lastSong,
+                    isPlaying = false,
+                    isBuffering = false,
+                    currentPosition = savedPos,
+                    duration = 0L
+                )
+
+                scope.launch {
+                    val artworkBitmap = withContext(Dispatchers.IO) {
+                        try {
+                            when {
+                                localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
+                                lastSong.highQualityImageUrl != null -> {
+                                    val request = ImageRequest.Builder(context)
+                                        .data(lastSong.highQualityImageUrl)
+                                        .allowHardware(false)
+                                        .build()
+                                    val result = (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
+                                    result
+                                }
+                                else -> null
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to load artwork for background restoration: ${e.message}", e)
+                            null
+                        }
+                    }
+
+                    if (artworkBitmap != null) {
+                        val stream = ByteArrayOutputStream()
+                        artworkBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                        val byteArray = stream.toByteArray()
+                        
+                        val updatedMetadata = MediaMetadata.Builder()
+                            .setTitle(lastSong.name)
+                            .setArtist(lastSong.primaryArtistNames)
+                            .setAlbumTitle(lastSong.album.name)
+                            .setArtworkUri(artworkUri)
+                            .setArtworkData(byteArray, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                            .build()
+                        
+                        val updatedMediaItem = MediaItem.Builder()
+                            .setUri(uri)
+                            .setMediaMetadata(updatedMetadata)
+                            .build()
+                        
+                        player.setMediaItem(updatedMediaItem)
+                        if (savedPos > 0) {
+                            player.seekTo(savedPos)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     companion object {
