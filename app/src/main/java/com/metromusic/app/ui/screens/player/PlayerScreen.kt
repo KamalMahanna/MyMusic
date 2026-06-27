@@ -58,6 +58,7 @@ fun PlayerScreen(
     val downloadState by viewModel.downloadState.collectAsState()
     val song = playbackState.currentSong ?: return
     val currentIndex by viewModel.queueIndex.collectAsState()
+    val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
 
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
@@ -190,12 +191,20 @@ fun PlayerScreen(
                 color = MaterialTheme.colorScheme.primary
             )
             if (!isTablet) {
-                IconButton(onClick = { showQueue = !showQueue }) {
+                IconButton(
+                    onClick = {
+                        if (showQueue) {
+                            viewModel.toggleShuffle()
+                        } else {
+                            showQueue = true
+                        }
+                    }
+                ) {
                     Icon(
-                        imageVector = if (showQueue) Icons.Default.MusicNote else Icons.Default.QueueMusic,
-                        contentDescription = "Toggle Queue",
+                        imageVector = if (showQueue) Icons.Default.Shuffle else Icons.Default.QueueMusic,
+                        contentDescription = if (showQueue) "Toggle Shuffle" else "Toggle Queue",
                         modifier = Modifier.size(28.dp),
-                        tint = if (showQueue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                        tint = if (showQueue && isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
                     )
                 }
             } else {
@@ -245,13 +254,28 @@ fun PlayerScreen(
                         .weight(1.2f)
                         .fillMaxHeight()
                 ) {
-                    Text(
-                        text = "PLAY QUEUE",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PLAY QUEUE",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        IconButton(onClick = { viewModel.toggleShuffle() }) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "Toggle Shuffle",
+                                modifier = Modifier.size(24.dp),
+                                tint = if (isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
                     QueueView(
                         viewModel = viewModel,
                         onSwipeDown = {}
@@ -486,6 +510,7 @@ fun QueueView(
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
     val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
+    val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
     val listState = rememberLazyListState()
 
     LaunchedEffect(currentIndex, queue) {
@@ -659,7 +684,7 @@ fun QueueView(
                                     modifier = Modifier.padding(12.dp)
                                 )
                             } else {
-                                val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
+                                val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
                                 SongDownloadIndicator(
                                     songId = song.id,
                                     playerViewModel = viewModel,
@@ -681,9 +706,10 @@ private fun PlayerScreenDownloadButton(
     viewModel: PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
+    val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
     val downloadState by viewModel.downloadState.collectAsState()
     val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-    val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
+    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
 
     if (isDownloading) {
         CircularProgressIndicator(

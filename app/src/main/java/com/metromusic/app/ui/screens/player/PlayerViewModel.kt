@@ -29,6 +29,7 @@ class PlayerViewModel @Inject constructor(
     val queue = queueManager.queue
     val queueIndex = queueManager.currentIndex
     val downloadedSongs = downloadRepository.downloadedSongs
+    val isShuffleEnabled = queueManager.isShuffleEnabled
 
     val currentSong: StateFlow<Song?> = musicPlayerManager.playbackState
         .map { it.currentSong }
@@ -113,5 +114,9 @@ class PlayerViewModel @Inject constructor(
 
     fun removeFromQueue(index: Int) {
         queueManager.removeAt(index)
+    }
+
+    fun toggleShuffle() {
+        queueManager.toggleShuffle()
     }
 }

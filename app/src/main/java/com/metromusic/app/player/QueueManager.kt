@@ -24,6 +24,11 @@ class QueueManager @Inject constructor(
     private val _currentIndex = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
+    private val _isShuffleEnabled = MutableStateFlow(false)
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+
+    private var originalQueue = emptyList<Song>()
+
     private val playedSongIds = mutableSetOf<String>()
     private val playedKeys = mutableSetOf<Pair<String, String>>()
     private var isLoadingSuggestions = false
@@ -45,11 +50,14 @@ class QueueManager @Inject constructor(
         try {
             val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
             val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
+            val originalJson = moshi.adapter<List<Song>>(listType).toJson(originalQueue)
             sharedPreferences.edit()
                 .putString("KEY_QUEUE", json)
                 .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
+                .putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
+                .putString("KEY_ORIGINAL_QUEUE", originalJson)
                 .apply()
-            Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}")
+            Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}, shuffle=${_isShuffleEnabled.value}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save queue state", e)
         }
@@ -59,8 +67,19 @@ class QueueManager @Inject constructor(
         try {
             val json = sharedPreferences.getString("KEY_QUEUE", null)
             val index = sharedPreferences.getInt("KEY_CURRENT_INDEX", -1)
+            val shuffleEnabled = sharedPreferences.getBoolean("KEY_SHUFFLE_ENABLED", false)
+            val originalJson = sharedPreferences.getString("KEY_ORIGINAL_QUEUE", null)
+            
+            _isShuffleEnabled.value = shuffleEnabled
+            val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
+            if (!originalJson.isNullOrEmpty()) {
+                val restoredOriginal: List<Song>? = moshi.adapter<List<Song>>(listType).fromJson(originalJson)
+                if (restoredOriginal != null) {
+                    originalQueue = restoredOriginal
+                }
+            }
+
             if (!json.isNullOrEmpty()) {
-                val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
                 val restored: List<Song>? = moshi.adapter<List<Song>>(listType).fromJson(json)
                 if (!restored.isNullOrEmpty()) {
                     _queue.value = restored
@@ -71,7 +90,7 @@ class QueueManager @Inject constructor(
                         playedSongIds.add(it.id)
                         playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
                     }
-                    Log.d(TAG, "restored state success: restored queue of size ${restored.size} at index $index")
+                    Log.d(TAG, "restored state success: restored queue of size ${restored.size} at index $index, shuffle=$shuffleEnabled")
                 }
             }
         } catch (e: Exception) {
@@ -93,20 +112,31 @@ class QueueManager @Inject constructor(
         }
         Log.d(TAG, "setQueue: after deduplication, queue size=${uniqueSongs.size}")
 
-        _queue.value = uniqueSongs
+        originalQueue = uniqueSongs
+
+        val finalQueue = if (_isShuffleEnabled.value && originalTargetSong != null) {
+            val rest = uniqueSongs.toMutableList()
+            rest.remove(originalTargetSong)
+            rest.shuffle()
+            listOf(originalTargetSong) + rest
+        } else {
+            uniqueSongs
+        }
+
+        _queue.value = finalQueue
         playedSongIds.clear()
         playedKeys.clear()
-        uniqueSongs.forEach {
+        finalQueue.forEach {
             playedSongIds.add(it.id)
             playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
         }
 
         val newIndex = if (originalTargetSong != null) {
-            uniqueSongs.indexOfFirst { it.id == originalTargetSong.id }
+            finalQueue.indexOfFirst { it.id == originalTargetSong.id }
         } else {
             -1
         }
-        _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, uniqueSongs.size - 1)
+        _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
         Log.d(TAG, "setQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
         saveState()
     }
@@ -116,6 +146,11 @@ class QueueManager @Inject constructor(
         if (!playedSongIds.contains(song.id) && !playedKeys.contains(key)) {
             Log.d(TAG, "addToQueue: adding song='${song.name}'")
             _queue.value = _queue.value + song
+            originalQueue = if (_isShuffleEnabled.value) {
+                originalQueue + song
+            } else {
+                _queue.value
+            }
             playedSongIds.add(song.id)
             playedKeys.add(key)
             saveState()
@@ -140,6 +175,11 @@ class QueueManager @Inject constructor(
                 }
             }
             _queue.value = _queue.value + uniqueIncoming
+            originalQueue = if (_isShuffleEnabled.value) {
+                originalQueue + uniqueIncoming
+            } else {
+                _queue.value
+            }
             uniqueIncoming.forEach {
                 playedSongIds.add(it.id)
                 playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
@@ -222,9 +262,41 @@ class QueueManager @Inject constructor(
         }
     }
 
+    fun toggleShuffle() {
+        val enabled = !_isShuffleEnabled.value
+        _isShuffleEnabled.value = enabled
+        
+        val current = currentSong
+        if (enabled) {
+            originalQueue = _queue.value
+            if (current != null) {
+                val rest = _queue.value.filter { it.id != current.id }.shuffled()
+                _queue.value = listOf(current) + rest
+                _currentIndex.value = 0
+            } else {
+                _queue.value = _queue.value.shuffled()
+                _currentIndex.value = -1
+            }
+            Log.d(TAG, "toggleShuffle: enabled, queue size=${_queue.value.size}")
+        } else {
+            if (originalQueue.isNotEmpty()) {
+                _queue.value = originalQueue
+                if (current != null) {
+                    val newIndex = originalQueue.indexOfFirst { it.id == current.id }
+                    _currentIndex.value = if (newIndex != -1) newIndex else 0
+                } else {
+                    _currentIndex.value = -1
+                }
+            }
+            Log.d(TAG, "toggleShuffle: disabled, queue size=${_queue.value.size}")
+        }
+        saveState()
+    }
+
     fun clear() {
         Log.d(TAG, "clear: clearing play queue")
         _queue.value = emptyList()
+        originalQueue = emptyList()
         _currentIndex.value = -1
         playedSongIds.clear()
         playedKeys.clear()
@@ -237,6 +309,11 @@ class QueueManager @Inject constructor(
         if (index in mutableQueue.indices) {
             val removedSong = mutableQueue.removeAt(index)
             _queue.value = mutableQueue
+            originalQueue = if (_isShuffleEnabled.value) {
+                originalQueue.filter { it.id != removedSong.id }
+            } else {
+                mutableQueue
+            }
             playedSongIds.remove(removedSong.id)
             playedKeys.remove(removedSong.name.lowercase().trim() to removedSong.primaryArtistNames.lowercase().trim())
             Log.d(TAG, "removeAt: removed song='${removedSong.name}'")
