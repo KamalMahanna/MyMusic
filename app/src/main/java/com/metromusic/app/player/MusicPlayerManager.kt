@@ -554,26 +554,8 @@ class MusicPlayerManager @Inject constructor(
                     }
 
                     if (artworkBitmap != null) {
-                        val stream = ByteArrayOutputStream()
-                        artworkBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                        val byteArray = stream.toByteArray()
-                        
-                        val updatedMetadata = MediaMetadata.Builder()
-                            .setTitle(lastSong.name)
-                            .setArtist(lastSong.primaryArtistNames)
-                            .setAlbumTitle(lastSong.album.name)
-                            .setArtworkUri(artworkUri)
-                            .setArtworkData(byteArray, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                            .build()
-                        
-                        val updatedMediaItem = MediaItem.Builder()
-                            .setUri(uri)
-                            .setMediaMetadata(updatedMetadata)
-                            .build()
-                        
-                        player.setMediaItem(updatedMediaItem)
-                        if (savedPos > 0) {
-                            player.seekTo(savedPos)
+                        if (queueManager.currentSong?.id == lastSong.id) {
+                            updateArtworkMetadata(player, artworkBitmap, lastSong)
                         }
                     }
                 }
