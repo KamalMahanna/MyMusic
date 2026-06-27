@@ -1,5 +1,7 @@
 package com.metromusic.app.ui.screens.home
 
+import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +10,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
+import kotlin.math.abs
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -23,9 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -56,7 +59,8 @@ fun HomeScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp) // padding for MiniPlayer
+                contentPadding = PaddingValues(bottom = 80.dp), // padding for MiniPlayer
+                flingBehavior = rememberFrictionFlingBehavior()
             ) {
                 items(
                     items = uiState.sections,
@@ -76,7 +80,8 @@ fun HomeScreen(
                         
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            flingBehavior = rememberFrictionFlingBehavior()
                         ) {
                             items(
                                 items = section.data,
@@ -90,10 +95,7 @@ fun HomeScreen(
                                         .clickable { viewModel.playModuleItem(item) }
                                 ) {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(item.mediumQualityImageUrl)
-                                            .crossfade(true)
-                                            .build(),
+                                        model = item.mediumQualityImageUrl,
                                         contentDescription = item.name,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -199,10 +201,7 @@ private fun PlaylistSheetContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(playlist.mediumQualityImageUrl)
-                    .crossfade(true)
-                    .build(),
+                model = playlist.mediumQualityImageUrl,
                 contentDescription = playlist.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -247,7 +246,8 @@ private fun PlaylistSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(bottom = 24.dp),
+                flingBehavior = rememberFrictionFlingBehavior()
             ) {
                 itemsIndexed(
                     items = songs,
@@ -257,13 +257,21 @@ private fun PlaylistSheetContent(
                     val isDownloading = activeDownloadSongId == song.id
                     val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
-                    SongListItem(
-                        song = song,
-                        onClick = {
+                    
+                    val onClick = remember(songs, index) {
+                        {
                             playerViewModel.playSongFromList(songs, index)
                             onPlaySong()
-                        },
-                        onDownloadClick = { playerViewModel.downloadSong(song) },
+                        }
+                    }
+                    val onDownloadClick = remember(song) {
+                        { playerViewModel.downloadSong(song) }
+                    }
+
+                    SongListItem(
+                        song = song,
+                        onClick = onClick,
+                        onDownloadClick = onDownloadClick,
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,
@@ -301,10 +309,7 @@ private fun AlbumSheetContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(album.mediumQualityImageUrl)
-                    .crossfade(true)
-                    .build(),
+                model = album.mediumQualityImageUrl,
                 contentDescription = album.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -349,7 +354,8 @@ private fun AlbumSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(bottom = 24.dp),
+                flingBehavior = rememberFrictionFlingBehavior()
             ) {
                 itemsIndexed(
                     items = songs,
@@ -359,13 +365,21 @@ private fun AlbumSheetContent(
                     val isDownloading = activeDownloadSongId == song.id
                     val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
-                    SongListItem(
-                        song = song,
-                        onClick = {
+                    
+                    val onClick = remember(songs, index) {
+                        {
                             playerViewModel.playSongFromList(songs, index)
                             onPlaySong()
-                        },
-                        onDownloadClick = { playerViewModel.downloadSong(song) },
+                        }
+                    }
+                    val onDownloadClick = remember(song) {
+                        { playerViewModel.downloadSong(song) }
+                    }
+
+                    SongListItem(
+                        song = song,
+                        onClick = onClick,
+                        onDownloadClick = onDownloadClick,
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,

@@ -1,19 +1,23 @@
 package com.metromusic.app.data.model
 
+import androidx.compose.runtime.Immutable
 import com.squareup.moshi.JsonClass
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class ApiResponse<T>(
     val success: Boolean,
     val data: T?
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class DownloadLink(
     val quality: String,
     val url: String
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class SongAlbum(
     val id: String?,
@@ -21,6 +25,7 @@ data class SongAlbum(
     val url: String?
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class ArtistMap(
     val id: String = "",
@@ -31,6 +36,7 @@ data class ArtistMap(
     val url: String = ""
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class SongArtists(
     val primary: List<ArtistMap> = emptyList(),
@@ -38,6 +44,7 @@ data class SongArtists(
     val all: List<ArtistMap> = emptyList()
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class Song(
     val id: String,
@@ -90,6 +97,7 @@ data class Song(
         }
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class SearchSongResult(
     val total: Int = 0,
@@ -97,6 +105,7 @@ data class SearchSongResult(
     val results: List<Song> = emptyList()
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class SearchArtistResult(
     val total: Int = 0,
@@ -104,6 +113,7 @@ data class SearchArtistResult(
     val results: List<SearchArtist> = emptyList()
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class SearchArtist(
     val id: String = "",
@@ -127,6 +137,7 @@ data class SearchArtist(
             ?: mediumQualityImageUrl
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class ArtistDetail(
     val id: String = "",
@@ -157,6 +168,7 @@ data class ArtistDetail(
             ?: mediumQualityImageUrl
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class Album(
     val id: String = "",
@@ -187,6 +199,7 @@ data class Album(
             ?: mediumQualityImageUrl
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class Playlist(
     val id: String = "",
@@ -216,6 +229,7 @@ data class Playlist(
             ?: mediumQualityImageUrl
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class ModuleItem(
     val id: String = "",
@@ -240,6 +254,7 @@ data class ModuleItem(
             ?: mediumQualityImageUrl
 }
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class ModuleSection(
     val title: String = "",
@@ -249,6 +264,7 @@ data class ModuleSection(
     val data: List<ModuleItem> = emptyList()
 )
 
+@Immutable
 data class DownloadedSong(
     val id: String,
     val name: String,

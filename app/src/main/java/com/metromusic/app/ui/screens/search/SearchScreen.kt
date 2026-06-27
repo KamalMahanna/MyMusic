@@ -1,5 +1,7 @@
 package com.metromusic.app.ui.screens.search
 
+import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
@@ -26,8 +28,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalContext
-import coil.request.ImageRequest
+
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -103,7 +104,8 @@ fun SearchScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(bottom = 80.dp),
+                flingBehavior = rememberFrictionFlingBehavior()
             ) {
                 if (uiState.filter == SearchFilter.SONGS) {
                     itemsIndexed(
@@ -113,13 +115,21 @@ fun SearchScreen(
                         val isDownloading = activeDownloadSongId == song.id
                         val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                         val isPlaying = currentPlayingSongId == song.id
-                        SongListItem(
-                            song = song,
-                            onClick = {
+                        
+                        val onClick = remember(uiState.songs, index) {
+                            {
                                 playerViewModel.playSongFromList(uiState.songs, index)
                                 onPlaySong()
-                            },
-                            onDownloadClick = { playerViewModel.downloadSong(song) },
+                            }
+                        }
+                        val onDownloadClick = remember(song) {
+                            { playerViewModel.downloadSong(song) }
+                        }
+
+                        SongListItem(
+                            song = song,
+                            onClick = onClick,
+                            onDownloadClick = onDownloadClick,
                             isDownloaded = isDownloaded,
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
@@ -140,10 +150,7 @@ fun SearchScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(artist.mediumQualityImageUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                model = artist.mediumQualityImageUrl,
                                 contentDescription = artist.name,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -189,10 +196,7 @@ fun SearchScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(artistDetail.mediumQualityImageUrl)
-                            .crossfade(true)
-                            .build(),
+                        model = artistDetail.mediumQualityImageUrl,
                         contentDescription = artistDetail.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -241,7 +245,8 @@ fun SearchScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = 24.dp)
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        flingBehavior = rememberFrictionFlingBehavior()
                     ) {
                         itemsIndexed(
                             items = topSongs,
@@ -250,14 +255,22 @@ fun SearchScreen(
                             val isDownloading = activeDownloadSongId == song.id
                             val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                             val isPlaying = currentPlayingSongId == song.id
-                            SongListItem(
-                                song = song,
-                                onClick = {
+                            
+                            val onClick = remember(topSongs, index) {
+                                {
                                     playerViewModel.playSongFromList(topSongs, index)
                                     viewModel.clearSelectedArtist()
                                     onPlaySong()
-                                },
-                                onDownloadClick = { playerViewModel.downloadSong(song) },
+                                }
+                            }
+                            val onDownloadClick = remember(song) {
+                                { playerViewModel.downloadSong(song) }
+                            }
+
+                            SongListItem(
+                                song = song,
+                                onClick = onClick,
+                                onDownloadClick = onDownloadClick,
                                 isDownloaded = isDownloaded,
                                 isDownloading = isDownloading,
                                 isPlaying = isPlaying

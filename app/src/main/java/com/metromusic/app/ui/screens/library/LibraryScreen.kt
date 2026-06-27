@@ -1,5 +1,7 @@
 package com.metromusic.app.ui.screens.library
 
+import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,9 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.ui.platform.LocalContext
-import coil.request.ImageRequest
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
 @Composable
@@ -43,7 +43,8 @@ fun LibraryScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp)
+        contentPadding = PaddingValues(bottom = 80.dp),
+        flingBehavior = rememberFrictionFlingBehavior()
     ) {
         item {
             Text(
@@ -73,10 +74,7 @@ fun LibraryScreen(
             ) {
                 if (!song.imageUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(song.imageUrl)
-                            .crossfade(true)
-                            .build(),
+                        model = song.imageUrl,
                         contentDescription = "Song Artwork",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

@@ -22,10 +22,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
-import coil.imageLoader
-import coil.request.ImageRequest
-import coil.request.SuccessResult
-import android.graphics.drawable.BitmapDrawable
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
 
 data class PlaybackState(
     val currentSong: Song? = null,
@@ -256,7 +257,7 @@ class MusicPlayerManager @Inject constructor(
                                 .build()
                             val result = loader.execute(request)
                             if (result is SuccessResult) {
-                                (result.drawable as? BitmapDrawable)?.bitmap
+                                result.image.toBitmap()
                             } else {
                                 null
                             }

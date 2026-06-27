@@ -6,10 +6,13 @@ import android.util.Log
 import com.metromusic.app.data.model.DownloadedSong
 import com.metromusic.app.data.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -21,6 +24,17 @@ class DownloadRepository @Inject constructor(
 ) {
     private val _downloadedSongs = MutableStateFlow<List<DownloadedSong>>(emptyList())
     val downloadedSongs: Flow<List<DownloadedSong>> = _downloadedSongs.asStateFlow()
+
+    @Volatile
+    private var downloadedFileNames = emptySet<String>()
+
+    private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    init {
+        repositoryScope.launch {
+            refreshDownloadedSongs()
+        }
+    }
 
     val downloadDir: File
         get() {
@@ -60,10 +74,18 @@ class DownloadRepository @Inject constructor(
     }
 
     fun isSongDownloaded(song: Song): Boolean {
+        val names = downloadedFileNames
+        if (names.isNotEmpty()) {
+            val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+            val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+            val m4aFileName = "$sanitizedName - $sanitizedArtist.m4a".lowercase()
+            val mp3FileName = "$sanitizedName - $sanitizedArtist.mp3".lowercase()
+            return names.contains(m4aFileName) || names.contains(mp3FileName)
+        }
+        
+        // Fallback to disk check if scan is not done yet
         val readableFile = getReadableFileForSong(song)
-        val isDownloaded = readableFile != null
-        Log.d(TAG, "isSongDownloaded: Song '${song.name}' downloaded=$isDownloaded (path=${readableFile?.absolutePath})")
-        return isDownloaded
+        return readableFile != null
     }
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
@@ -145,6 +167,7 @@ class DownloadRepository @Inject constructor(
 
         Log.d(TAG, "refreshDownloadedSongs: Refreshed ${songs.size} songs in StateFlow")
         _downloadedSongs.value = songs
+        downloadedFileNames = files.map { it.name.lowercase() }.toSet()
     }
 
     fun getCachedArtworkForSong(song: Song): File? {

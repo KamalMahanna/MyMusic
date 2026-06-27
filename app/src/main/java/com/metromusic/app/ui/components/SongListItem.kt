@@ -15,12 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
-import coil.request.ImageRequest
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.metromusic.app.data.model.Song
 
 import androidx.compose.ui.text.font.FontWeight
@@ -49,16 +48,15 @@ fun SongListItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(animatedBgColor)
+            .drawBehind {
+                drawRect(animatedBgColor)
+            }
             .clickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(song.mediumQualityImageUrl)
-                .crossfade(true)
-                .build(),
+            model = song.mediumQualityImageUrl,
             contentDescription = "Song Artwork",
             contentScale = ContentScale.Crop,
             modifier = Modifier

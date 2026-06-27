@@ -39,12 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.ui.platform.LocalContext
-import coil.request.ImageRequest
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.player.QueueManager
 import com.metromusic.app.ui.components.SongDownloadIndicator
+import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,10 +232,7 @@ fun PlayerScreen(
 
                             // Large Artwork
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(currentSong.highQualityImageUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                model = currentSong.highQualityImageUrl,
                                 contentDescription = "Artwork",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -429,7 +425,8 @@ fun QueueView(
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            flingBehavior = rememberFrictionFlingBehavior()
         ) {
             itemsIndexed(
                 items = queue,
@@ -482,10 +479,7 @@ fun QueueView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(song.mediumQualityImageUrl)
-                                .crossfade(true)
-                                .build(),
+                            model = song.mediumQualityImageUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
