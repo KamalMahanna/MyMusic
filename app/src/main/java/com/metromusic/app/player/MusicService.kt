@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -27,6 +28,7 @@ class MusicService : MediaSessionService() {
         Log.d(TAG, "onCreate() service started")
         super.onCreate()
         createNotificationChannel()
+        promoteToForegroundImmediate()
 
         val player = musicPlayerManager.getPlayer()
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -42,6 +44,43 @@ class MusicService : MediaSessionService() {
             .setSessionActivity(pendingIntent)
             .build()
         Log.d(TAG, "MediaSession successfully built and set up")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        promoteToForegroundImmediate()
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun promoteToForegroundImmediate() {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val fallbackNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Metro Music")
+            .setContentText("Preparing playback...")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build()
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    1001,
+                    fallbackNotification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(1001, fallbackNotification)
+            }
+            Log.d(TAG, "Promoted service to foreground successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground safely: ${e.message}", e)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

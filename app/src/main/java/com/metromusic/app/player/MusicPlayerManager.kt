@@ -13,6 +13,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.data.repository.DownloadRepository
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +61,7 @@ class MusicPlayerManager @Inject constructor(
                 true
             )
             .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
             .also { player ->
                 Log.d(TAG, "ExoPlayer created and configured")
@@ -135,7 +137,7 @@ class MusicPlayerManager @Inject constructor(
         try {
             Log.d(TAG, "Starting MusicService")
             val intent = Intent(context, MusicService::class.java)
-            context.startService(intent)
+            ContextCompat.startForegroundService(context, intent)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
         }
@@ -317,7 +319,13 @@ class MusicPlayerManager @Inject constructor(
         Log.d(TAG, "playNext() invoked")
         if (queueManager.isNearEnd()) {
             Log.d(TAG, "Queue near end, pre-loading suggestions")
-            queueManager.loadMoreSuggestions()
+            scope.launch {
+                try {
+                    queueManager.loadMoreSuggestions()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load suggestions in playNext: ${e.message}", e)
+                }
+            }
         }
         val nextSong = queueManager.moveToNext()
         Log.d(TAG, "playNext: nextSong='${nextSong?.name}'")
@@ -348,7 +356,7 @@ class MusicPlayerManager @Inject constructor(
             try {
                 Log.d(TAG, "Starting MusicService on resume")
                 val intent = Intent(context, MusicService::class.java)
-                context.startService(intent)
+                ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
             }
