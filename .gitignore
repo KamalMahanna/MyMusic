@@ -24,3 +24,6 @@ Thumbs.db
 
 # Device captures
 captures/
+release.keystore
+*.keystore
+*.jks
