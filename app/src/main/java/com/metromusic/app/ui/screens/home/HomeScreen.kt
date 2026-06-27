@@ -30,6 +30,7 @@ import com.metromusic.app.ui.screens.player.PlayerViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onPlaySong: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -140,11 +141,16 @@ fun HomeScreen(
         if (uiState.selectedPlaylist != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedPlaylist() },
-                sheetState = playlistSheetState
+                sheetState = playlistSheetState,
+                modifier = Modifier.fillMaxHeight(0.8f)
             ) {
                 PlaylistSheetContent(
                     playlist = uiState.selectedPlaylist!!,
-                    playerViewModel = playerViewModel
+                    playerViewModel = playerViewModel,
+                    onPlaySong = {
+                        viewModel.clearSelectedPlaylist()
+                        onPlaySong()
+                    }
                 )
             }
         }
@@ -152,11 +158,16 @@ fun HomeScreen(
         if (uiState.selectedAlbum != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedAlbum() },
-                sheetState = albumSheetState
+                sheetState = albumSheetState,
+                modifier = Modifier.fillMaxHeight(0.8f)
             ) {
                 AlbumSheetContent(
                     album = uiState.selectedAlbum!!,
-                    playerViewModel = playerViewModel
+                    playerViewModel = playerViewModel,
+                    onPlaySong = {
+                        viewModel.clearSelectedAlbum()
+                        onPlaySong()
+                    }
                 )
             }
         }
@@ -171,7 +182,8 @@ fun HomeScreen(
 @Composable
 private fun PlaylistSheetContent(
     playlist: com.metromusic.app.data.model.Playlist,
-    playerViewModel: PlayerViewModel
+    playerViewModel: PlayerViewModel,
+    onPlaySong: () -> Unit
 ) {
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
@@ -180,6 +192,7 @@ private fun PlaylistSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .padding(horizontal = 16.dp)
     ) {
         Row(
@@ -239,7 +252,7 @@ private fun PlaylistSheetContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.6f),
+                    .weight(1f),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 itemsIndexed(
@@ -252,7 +265,10 @@ private fun PlaylistSheetContent(
                     val isPlaying = currentPlayingSongId == song.id
                     SongListItem(
                         song = song,
-                        onClick = { playerViewModel.playSongFromList(songs, index) },
+                        onClick = {
+                            playerViewModel.playSongFromList(songs, index)
+                            onPlaySong()
+                        },
                         onDownloadClick = { playerViewModel.downloadSong(song) },
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,
@@ -271,7 +287,8 @@ private fun PlaylistSheetContent(
 @Composable
 private fun AlbumSheetContent(
     album: com.metromusic.app.data.model.Album,
-    playerViewModel: PlayerViewModel
+    playerViewModel: PlayerViewModel,
+    onPlaySong: () -> Unit
 ) {
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
@@ -280,6 +297,7 @@ private fun AlbumSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .padding(horizontal = 16.dp)
     ) {
         Row(
@@ -339,7 +357,7 @@ private fun AlbumSheetContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.6f),
+                    .weight(1f),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 itemsIndexed(
@@ -352,7 +370,10 @@ private fun AlbumSheetContent(
                     val isPlaying = currentPlayingSongId == song.id
                     SongListItem(
                         song = song,
-                        onClick = { playerViewModel.playSongFromList(songs, index) },
+                        onClick = {
+                            playerViewModel.playSongFromList(songs, index)
+                            onPlaySong()
+                        },
                         onDownloadClick = { playerViewModel.downloadSong(song) },
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,

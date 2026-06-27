@@ -105,9 +105,18 @@ fun MetroMusicNavGraph() {
                         slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it / 12 }
                     }
                 ) {
-                    composable(Screen.Home.route) { HomeScreen() }
-                    composable(Screen.Search.route) { SearchScreen(isPlayerExpanded = isPlayerExpanded) }
-                    composable(Screen.Library.route) { LibraryScreen() }
+                    composable(Screen.Home.route) {
+                        HomeScreen(onPlaySong = { isPlayerExpanded = true })
+                    }
+                    composable(Screen.Search.route) {
+                        SearchScreen(
+                            isPlayerExpanded = isPlayerExpanded,
+                            onPlaySong = { isPlayerExpanded = true }
+                        )
+                    }
+                    composable(Screen.Library.route) {
+                        LibraryScreen(onPlaySong = { isPlayerExpanded = true })
+                    }
                 }
                 
                 // MiniPlayer slides and fades away as the full player slides up

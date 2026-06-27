@@ -26,6 +26,7 @@ import com.metromusic.app.ui.screens.player.PlayerViewModel
 
 @Composable
 fun LibraryScreen(
+    onPlaySong: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -64,6 +65,7 @@ fun LibraryScreen(
                         val index = songList.indexOfFirst { it.id == song.id }
                         if (index != -1) {
                             playerViewModel.playSongFromList(songList, index)
+                            onPlaySong()
                         }
                     }
                     .padding(16.dp),

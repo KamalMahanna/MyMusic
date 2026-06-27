@@ -35,6 +35,7 @@ import com.metromusic.app.ui.screens.player.PlayerViewModel
 @Composable
 fun SearchScreen(
     isPlayerExpanded: Boolean,
+    onPlaySong: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -114,7 +115,10 @@ fun SearchScreen(
                         val isPlaying = currentPlayingSongId == song.id
                         SongListItem(
                             song = song,
-                            onClick = { playerViewModel.playSongFromList(uiState.songs, index) },
+                            onClick = {
+                                playerViewModel.playSongFromList(uiState.songs, index)
+                                onPlaySong()
+                            },
                             onDownloadClick = { playerViewModel.downloadSong(song) },
                             isDownloaded = isDownloaded,
                             isDownloading = isDownloading,
@@ -248,7 +252,11 @@ fun SearchScreen(
                             val isPlaying = currentPlayingSongId == song.id
                             SongListItem(
                                 song = song,
-                                onClick = { playerViewModel.playSongFromList(topSongs, index) },
+                                onClick = {
+                                    playerViewModel.playSongFromList(topSongs, index)
+                                    viewModel.clearSelectedArtist()
+                                    onPlaySong()
+                                },
                                 onDownloadClick = { playerViewModel.downloadSong(song) },
                                 isDownloaded = isDownloaded,
                                 isDownloading = isDownloading,
