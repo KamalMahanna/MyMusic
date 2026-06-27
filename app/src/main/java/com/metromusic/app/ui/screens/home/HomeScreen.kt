@@ -10,6 +10,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import kotlin.math.abs
@@ -40,6 +44,9 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+    val cardSize = if (isTablet) 160.dp else 120.dp
 
     // Hoist sheet states so they survive recompositions and avoid animation jank on open
     val playlistSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -91,7 +98,7 @@ fun HomeScreen(
                                 Column(
                                     modifier = Modifier
                                         .animateItem()
-                                        .width(120.dp)
+                                        .width(cardSize)
                                         .clickable {
                                             if (item.type.lowercase().trim() == "song") {
                                                 onPlaySong()
@@ -104,7 +111,7 @@ fun HomeScreen(
                                         contentDescription = item.name,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
-                                            .size(120.dp)
+                                            .size(cardSize)
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant)
                                     )
@@ -182,6 +189,7 @@ private fun PlaylistSheetContent(
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
     Column(
         modifier = Modifier
@@ -246,7 +254,8 @@ private fun PlaylistSheetContent(
                 Text("No songs found.")
             }
         } else {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (isTablet) 2 else 1),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
@@ -299,6 +308,7 @@ private fun AlbumSheetContent(
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
     Column(
         modifier = Modifier
@@ -363,7 +373,8 @@ private fun AlbumSheetContent(
                 Text("No songs found.")
             }
         } else {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (isTablet) 2 else 1),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),

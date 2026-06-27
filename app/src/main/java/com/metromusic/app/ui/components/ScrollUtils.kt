@@ -26,12 +26,15 @@ fun rememberFrictionFlingBehavior(frictionMultiplier: Float = 0.7f): FlingBehavi
     val maxVelocityPx = remember(density) {
         with(density) { 3500.dp.toPx() }
     }
+    val velocityThreshold = remember(density) {
+        with(density) { 150.dp.toPx() }
+    }
     
     val decaySpec = remember(frictionMultiplier) {
         exponentialDecay<Float>(frictionMultiplier = frictionMultiplier)
     }
     
-    return remember(decaySpec, maxVelocityPx) {
+    return remember(decaySpec, maxVelocityPx, velocityThreshold) {
         object : FlingBehavior {
             override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
                 // Clamp maximum fling velocity to prevent flying too far with low friction
@@ -55,6 +58,12 @@ fun rememberFrictionFlingBehavior(frictionMultiplier: Float = 0.7f): FlingBehavi
                     
                     // Cancel the fling animation if we hit the bounds of the list
                     if (abs(delta - consumed) > 0.5f) {
+                        cancelAnimation()
+                    }
+                    
+                    // Cancel the fling animation early if velocity is extremely low
+                    // to prevent the long tail from blocking subsequent clicks
+                    if (abs(velocity) < velocityThreshold) {
                         cancelAnimation()
                     }
                 }

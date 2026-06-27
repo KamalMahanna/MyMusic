@@ -4,9 +4,11 @@ import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
@@ -31,6 +33,8 @@ fun LibraryScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val songs by viewModel.downloadedSongs.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
 
     if (songs.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -39,14 +43,15 @@ fun LibraryScreen(
         return
     }
 
-    val listState = rememberLazyListState()
-    LazyColumn(
-        state = listState,
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(if (isTablet) 2 else 1),
+        state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp),
         flingBehavior = rememberFrictionFlingBehavior()
     ) {
-        item {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 text = "Downloads",
                 style = MaterialTheme.typography.headlineMedium,

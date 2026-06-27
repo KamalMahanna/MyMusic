@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -24,10 +29,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed as listItemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.style.TextOverflow
 
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
@@ -44,6 +50,7 @@ fun SearchScreen(
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -100,9 +107,16 @@ fun SearchScreen(
                 Text(text = "Error: ${uiState.error}")
             }
         } else {
-            val listState = rememberLazyListState()
-            LazyColumn(
-                state = listState,
+            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(
+                    if (uiState.filter == SearchFilter.SONGS) {
+                        if (isTablet) 2 else 1
+                    } else {
+                        if (isTablet) 4 else 1
+                    }
+                ),
+                state = gridState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 80.dp),
                 flingBehavior = rememberFrictionFlingBehavior()
@@ -141,24 +155,52 @@ fun SearchScreen(
                         items = uiState.artists,
                         key = { artist -> artist.id }
                     ) { artist ->
-                        Row(
-                            modifier = Modifier
-                                .animateItem()
-                                .fillMaxWidth()
-                                .clickable { viewModel.selectArtist(artist.id) }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = artist.mediumQualityImageUrl,
-                                contentDescription = artist.name,
-                                contentScale = ContentScale.Crop,
+                        if (isTablet) {
+                            Column(
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(text = artist.name, style = MaterialTheme.typography.bodyLarge)
+                                    .animateItem()
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.selectArtist(artist.id) }
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                AsyncImage(
+                                    model = artist.mediumQualityImageUrl,
+                                    contentDescription = artist.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .clip(CircleShape)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = artist.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .animateItem()
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.selectArtist(artist.id) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = artist.mediumQualityImageUrl,
+                                    contentDescription = artist.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(text = artist.name, style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
                 }
@@ -243,7 +285,8 @@ fun SearchScreen(
                         Text("No songs found.")
                     }
                 } else {
-                    LazyColumn(
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(if (isTablet) 2 else 1),
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(bottom = 24.dp),
                         flingBehavior = rememberFrictionFlingBehavior()

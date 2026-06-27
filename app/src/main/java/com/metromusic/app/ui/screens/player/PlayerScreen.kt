@@ -58,13 +58,61 @@ fun PlayerScreen(
     val song = playbackState.currentSong ?: return
     val currentIndex by viewModel.queueIndex.collectAsState()
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+
     var showQueue by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     var dragOffsetX by remember { mutableStateOf(0f) }
     var dragOffsetY by remember { mutableStateOf(0f) }
 
-    val playerGestureModifier = if (!showQueue) {
+    val playerGestureModifier = if (!isTablet) {
+        if (!showQueue) {
+            Modifier.pointerInput(currentIndex) {
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffsetX += dragAmount.x
+                        dragOffsetY += dragAmount.y
+                    },
+                    onDragEnd = {
+                        val swipeThresholdPx = with(density) { 30.dp.toPx() }
+                        if (kotlin.math.abs(dragOffsetX) > kotlin.math.abs(dragOffsetY)) {
+                            // Horizontal Swipe
+                            if (dragOffsetX < -swipeThresholdPx) {
+                                // Swipe Left -> Play Next
+                                viewModel.playNext()
+                            } else if (dragOffsetX > swipeThresholdPx) {
+                                // Swipe Right -> Play Previous or Replay from start
+                                if (currentIndex == 0) {
+                                    viewModel.seekTo(0)
+                                } else {
+                                    viewModel.playPrevious()
+                                }
+                            }
+                        } else {
+                            // Vertical Swipe
+                            if (dragOffsetY < -swipeThresholdPx) {
+                                // Swipe Up -> Open Play Queue
+                                showQueue = true
+                            } else if (dragOffsetY > swipeThresholdPx) {
+                                // Swipe Down -> Collapse Player
+                                onCollapse()
+                            }
+                        }
+                        dragOffsetX = 0f
+                        dragOffsetY = 0f
+                    },
+                    onDragCancel = {
+                        dragOffsetX = 0f
+                        dragOffsetY = 0f
+                    }
+                )
+            }
+        } else Modifier
+    } else {
+        // On tablet: Only support swipe down to collapse, and swipe left/right to skip songs
         Modifier.pointerInput(currentIndex) {
             detectDragGestures(
                 onDrag = { change, dragAmount ->
@@ -75,12 +123,9 @@ fun PlayerScreen(
                 onDragEnd = {
                     val swipeThresholdPx = with(density) { 30.dp.toPx() }
                     if (kotlin.math.abs(dragOffsetX) > kotlin.math.abs(dragOffsetY)) {
-                        // Horizontal Swipe
                         if (dragOffsetX < -swipeThresholdPx) {
-                            // Swipe Left -> Play Next
                             viewModel.playNext()
                         } else if (dragOffsetX > swipeThresholdPx) {
-                            // Swipe Right -> Play Previous or Replay from start
                             if (currentIndex == 0) {
                                 viewModel.seekTo(0)
                             } else {
@@ -88,12 +133,7 @@ fun PlayerScreen(
                             }
                         }
                     } else {
-                        // Vertical Swipe
-                        if (dragOffsetY < -swipeThresholdPx) {
-                            // Swipe Up -> Open Play Queue
-                            showQueue = true
-                        } else if (dragOffsetY > swipeThresholdPx) {
-                            // Swipe Down -> Collapse Player
+                        if (dragOffsetY > swipeThresholdPx) {
                             onCollapse()
                         }
                     }
@@ -106,7 +146,7 @@ fun PlayerScreen(
                 }
             )
         }
-    } else Modifier
+    }
 
     Column(
         modifier = modifier
@@ -131,7 +171,9 @@ fun PlayerScreen(
         ) {
             IconButton(
                 onClick = {
-                    if (showQueue) showQueue = false else onCollapse()
+                    if (isTablet) onCollapse() else {
+                        if (showQueue) showQueue = false else onCollapse()
+                    }
                 }
             ) {
                 Icon(
@@ -141,233 +183,292 @@ fun PlayerScreen(
                 )
             }
             Text(
-                text = if (showQueue) "PLAY QUEUE" else "NOW PLAYING",
+                text = if (isTablet) "NOW PLAYING" else (if (showQueue) "PLAY QUEUE" else "NOW PLAYING"),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            IconButton(onClick = { showQueue = !showQueue }) {
-                Icon(
-                    imageVector = if (showQueue) Icons.Default.MusicNote else Icons.Default.QueueMusic,
-                    contentDescription = "Toggle Queue",
-                    modifier = Modifier.size(28.dp),
-                    tint = if (showQueue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                )
+            if (!isTablet) {
+                IconButton(onClick = { showQueue = !showQueue }) {
+                    Icon(
+                        imageVector = if (showQueue) Icons.Default.MusicNote else Icons.Default.QueueMusic,
+                        contentDescription = "Toggle Queue",
+                        modifier = Modifier.size(28.dp),
+                        tint = if (showQueue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        AnimatedContent(
-            targetState = showQueue,
-            transitionSpec = {
-                if (targetState) {
-                    // Slide up & fade in queue, slide up & fade out player
-                    (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
-                     fadeIn(animationSpec = tween(300)))
-                        .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
-                                      fadeOut(animationSpec = tween(300)))
-                } else {
-                    // Slide down & fade in player, slide down & fade out queue
-                    (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
-                     fadeIn(animationSpec = tween(300)))
-                        .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
-                                      fadeOut(animationSpec = tween(300)))
-                }
-            },
-            label = "QueueTransition",
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-        ) { isQueueVisible ->
-            if (isQueueVisible) {
-                // Queue View
-                QueueView(
-                    viewModel = viewModel,
-                    onSwipeDown = { showQueue = false }
-                )
-            } else {
-                // Main Player View
-                var prevIndex by remember { mutableStateOf(currentIndex) }
-                val isNext = currentIndex >= prevIndex
-
-                LaunchedEffect(currentIndex) {
-                    prevIndex = currentIndex
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxSize()
+        if (isTablet) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left pane: Now playing content
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 ) {
-                    // Only Artwork & Info transitions horizontally
-                    AnimatedContent(
-                        targetState = song,
-                        transitionSpec = {
-                            if (isNext) {
-                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                 fadeIn(animationSpec = tween(250)))
-                                    .togetherWith(
-                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
-                                        fadeOut(animationSpec = tween(250))
-                                    )
-                            } else {
-                                (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
-                                 fadeIn(animationSpec = tween(250)))
-                                    .togetherWith(
-                                        slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
-                                        fadeOut(animationSpec = tween(250))
-                                    )
-                            }
-                        },
-                        label = "SongChangeTransition",
-                        modifier = Modifier.weight(1.0f)
-                    ) { currentSong ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Spacer(modifier = Modifier.weight(1f))
+                    TabletNowPlayingContent(
+                        song = song,
+                        playbackState = playbackState,
+                        currentIndex = currentIndex,
+                        viewModel = viewModel
+                    )
+                }
 
-                            // Large Artwork
-                            AsyncImage(
-                                model = currentSong.highQualityImageUrl,
-                                contentDescription = "Artwork",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth(0.85f)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(24.dp))
-                            )
+                Spacer(modifier = Modifier.width(32.dp))
 
-                            Spacer(modifier = Modifier.weight(1f))
+                VerticalDivider(
+                    modifier = Modifier
+                        .fillMaxHeight(0.9f)
+                        .padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f)
+                )
 
-                            // Song Title & Artist Info
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                Spacer(modifier = Modifier.width(32.dp))
+
+                // Right pane: QueueView content
+                Column(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight()
+                ) {
+                    Text(
+                        text = "PLAY QUEUE",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    QueueView(
+                        viewModel = viewModel,
+                        onSwipeDown = {}
+                    )
+                }
+            }
+        } else {
+            AnimatedContent(
+                targetState = showQueue,
+                transitionSpec = {
+                    if (targetState) {
+                        // Slide up & fade in queue, slide up & fade out player
+                        (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
+                         fadeIn(animationSpec = tween(300)))
+                            .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
+                                          fadeOut(animationSpec = tween(300)))
+                    } else {
+                        // Slide down & fade in player, slide down & fade out queue
+                        (slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { -it } + 
+                         fadeIn(animationSpec = tween(300)))
+                            .togetherWith(slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it } + 
+                                          fadeOut(animationSpec = tween(300)))
+                    }
+                },
+                label = "QueueTransition",
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+            ) { isQueueVisible ->
+                if (isQueueVisible) {
+                    // Queue View
+                    QueueView(
+                        viewModel = viewModel,
+                        onSwipeDown = { showQueue = false }
+                    )
+                } else {
+                    // Main Player View
+                    var prevIndex by remember { mutableStateOf(currentIndex) }
+                    val isNext = currentIndex >= prevIndex
+
+                    LaunchedEffect(currentIndex) {
+                        prevIndex = currentIndex
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Only Artwork & Info transitions horizontally
+                        AnimatedContent(
+                            targetState = song,
+                            transitionSpec = {
+                                if (isNext) {
+                                    (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                     fadeIn(animationSpec = tween(250)))
+                                        .togetherWith(
+                                            slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                            fadeOut(animationSpec = tween(250))
+                                        )
+                                } else {
+                                    (slideInHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> -width } + 
+                                     fadeIn(animationSpec = tween(250)))
+                                        .togetherWith(
+                                            slideOutHorizontally(animationSpec = tween(350, easing = FastOutSlowInEasing)) { width -> width } + 
+                                            fadeOut(animationSpec = tween(250))
+                                        )
+                                }
+                            },
+                            label = "SongChangeTransition",
+                            modifier = Modifier.weight(1.0f)
+                        ) { currentSong ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = currentSong.name,
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .basicMarquee(
-                                                iterations = Int.MAX_VALUE,
-                                                spacing = MarqueeSpacing(48.dp)
-                                            )
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = currentSong.primaryArtistNames,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                // Large Artwork
+                                AsyncImage(
+                                    model = currentSong.highQualityImageUrl,
+                                    contentDescription = "Artwork",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(24.dp))
+                                )
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                // Song Title & Artist Info
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = currentSong.name,
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .basicMarquee(
+                                                    iterations = Int.MAX_VALUE,
+                                                    spacing = MarqueeSpacing(48.dp)
+                                                )
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = currentSong.primaryArtistNames,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    // Download Button
+                                    PlayerScreenDownloadButton(
+                                        song = currentSong,
+                                        viewModel = viewModel
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                // Progress Slider (Transitions with title)
+                                val progress = if (playbackState.duration > 0) {
+                                    playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+                                } else 0f
 
-                                // Download Button
-                                PlayerScreenDownloadButton(
-                                    song = currentSong,
-                                    viewModel = viewModel
+                                var sliderPosition by remember { mutableStateOf<Float?>(null) }
+
+                                Slider(
+                                    value = sliderPosition ?: progress,
+                                    onValueChange = { sliderPosition = it },
+                                    onValueChangeFinished = {
+                                        sliderPosition?.let { pos ->
+                                            viewModel.seekTo((pos * playbackState.duration).toLong())
+                                        }
+                                        sliderPosition = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
                                 )
+
+                                // Progress Time Labels
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = formatMillis(playbackState.currentPosition),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = formatMillis(playbackState.duration),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Progress Slider (Transitions with title)
-                            val progress = if (playbackState.duration > 0) {
-                                playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
-                            } else 0f
-
-                            var sliderPosition by remember { mutableStateOf<Float?>(null) }
-
-                            Slider(
-                                value = sliderPosition ?: progress,
-                                onValueChange = { sliderPosition = it },
-                                onValueChangeFinished = {
-                                    sliderPosition?.let { pos ->
-                                        viewModel.seekTo((pos * playbackState.duration).toLong())
-                                    }
-                                    sliderPosition = null
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            // Progress Time Labels
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = formatMillis(playbackState.currentPosition),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = formatMillis(playbackState.duration),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.weight(0.1f))
-
-                    // Controls Row (Static)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { viewModel.playPrevious() }) {
-                            Icon(
-                                imageVector = Icons.Default.SkipPrevious,
-                                contentDescription = "Previous",
-                                modifier = Modifier.size(48.dp)
-                            )
                         }
 
-                        FloatingActionButton(
-                            onClick = { viewModel.togglePlayPause() },
-                            shape = RoundedCornerShape(100.dp),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(72.dp)
+                        Spacer(modifier = Modifier.weight(0.1f))
+
+                        // Controls Row (Static)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (playbackState.isBuffering) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    strokeWidth = 3.dp
-                                )
-                            } else {
+                            IconButton(onClick = { viewModel.playPrevious() }) {
                                 Icon(
-                                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = "Play/Pause",
-                                    modifier = Modifier.size(40.dp)
+                                    imageVector = Icons.Default.SkipPrevious,
+                                    contentDescription = "Previous",
+                                    modifier = Modifier.size(48.dp)
+                                )
+                            }
+
+                            FloatingActionButton(
+                                onClick = { viewModel.togglePlayPause() },
+                                shape = RoundedCornerShape(100.dp),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(72.dp)
+                            ) {
+                                if (playbackState.isBuffering) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(36.dp),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        strokeWidth = 3.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = "Play/Pause",
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                            }
+
+                            IconButton(onClick = { viewModel.playNext() }) {
+                                Icon(
+                                    imageVector = Icons.Default.SkipNext,
+                                    contentDescription = "Next",
+                                    modifier = Modifier.size(48.dp)
                                 )
                             }
                         }
 
-                        IconButton(onClick = { viewModel.playNext() }) {
-                            Icon(
-                                imageVector = Icons.Default.SkipNext,
-                                contentDescription = "Next",
-                                modifier = Modifier.size(48.dp)
-                            )
-                        }
+                        Spacer(modifier = Modifier.weight(0.1f))
                     }
-
-                    Spacer(modifier = Modifier.weight(0.1f))
                 }
             }
         }
@@ -385,6 +486,12 @@ fun QueueView(
     val currentIndex by viewModel.queueIndex.collectAsState()
     val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
     val listState = rememberLazyListState()
+
+    LaunchedEffect(currentIndex, queue) {
+        if (queue.isNotEmpty() && currentIndex in queue.indices) {
+            listState.animateScrollToItem(currentIndex)
+        }
+    }
 
     // Detect if we are scrolled to the top
     val isAtTop by remember {
@@ -563,6 +670,159 @@ private fun PlayerScreenDownloadButton(
                 tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
             )
         }
+    }
+}
+
+@Composable
+private fun TabletNowPlayingContent(
+    song: Song,
+    playbackState: com.metromusic.app.player.PlaybackState,
+    currentIndex: Int,
+    viewModel: PlayerViewModel
+) {
+    var prevIndex by remember { mutableStateOf(currentIndex) }
+    val isNext = currentIndex >= prevIndex
+
+    LaunchedEffect(currentIndex) {
+        prevIndex = currentIndex
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Spacer(modifier = Modifier.weight(0.5f))
+
+        AsyncImage(
+            model = song.highQualityImageUrl,
+            contentDescription = "Artwork",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxHeight(0.55f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(24.dp))
+        )
+
+        Spacer(modifier = Modifier.weight(0.5f))
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            spacing = MarqueeSpacing(48.dp)
+                        )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = song.primaryArtistNames,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            PlayerScreenDownloadButton(
+                song = song,
+                viewModel = viewModel
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        val progress = if (playbackState.duration > 0) {
+            playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+        } else 0f
+
+        var sliderPosition by remember { mutableStateOf<Float?>(null) }
+
+        Slider(
+            value = sliderPosition ?: progress,
+            onValueChange = { sliderPosition = it },
+            onValueChangeFinished = {
+                sliderPosition?.let { pos ->
+                    viewModel.seekTo((pos * playbackState.duration).toLong())
+                }
+                sliderPosition = null
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatMillis(playbackState.currentPosition),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = formatMillis(playbackState.duration),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { viewModel.playPrevious() }) {
+                Icon(
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = "Previous",
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
+            FloatingActionButton(
+                onClick = { viewModel.togglePlayPause() },
+                shape = RoundedCornerShape(100.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(72.dp)
+            ) {
+                if (playbackState.isBuffering) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play/Pause",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+
+            IconButton(onClick = { viewModel.playNext() }) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "Next",
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 

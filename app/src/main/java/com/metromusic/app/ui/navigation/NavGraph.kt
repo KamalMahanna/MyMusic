@@ -10,8 +10,18 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -57,15 +67,23 @@ fun MetroMusicNavGraph() {
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
 
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+
     Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            bottomBar = {
-                NavigationBar {
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (isTablet) {
+                NavigationRail(
+                    modifier = Modifier.fillMaxHeight(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ) {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentDestination = navBackStackEntry?.destination
 
+                    Spacer(modifier = Modifier.height(24.dp))
+
                     items.forEach { screen ->
-                        NavigationBarItem(
+                        NavigationRailItem(
                             icon = { Icon(screen.icon, contentDescription = screen.title) },
                             label = { Text(screen.title) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
@@ -82,67 +100,99 @@ fun MetroMusicNavGraph() {
                     }
                 }
             }
-        ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home.route,
-                    modifier = Modifier.fillMaxSize(),
-                    enterTransition = {
-                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 12 }
-                    },
-                    exitTransition = {
-                        fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it / 12 }
-                    },
-                    popEnterTransition = {
-                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { -it / 12 }
-                    },
-                    popExitTransition = {
-                        fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it / 12 }
-                    }
-                ) {
-                    composable(Screen.Home.route) {
-                        HomeScreen(onPlaySong = { isPlayerExpanded = true })
-                    }
-                    composable(Screen.Search.route) {
-                        SearchScreen(
-                            isPlayerExpanded = isPlayerExpanded,
-                            onPlaySong = { isPlayerExpanded = true }
-                        )
-                    }
-                    composable(Screen.Library.route) {
-                        LibraryScreen(onPlaySong = { isPlayerExpanded = true })
+
+            Scaffold(
+                bottomBar = {
+                    if (!isTablet) {
+                        NavigationBar {
+                            val navBackStackEntry by navController.currentBackStackEntryAsState()
+                            val currentDestination = navBackStackEntry?.destination
+
+                            items.forEach { screen ->
+                                NavigationBarItem(
+                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
+                                    label = { Text(screen.title) },
+                                    selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                                    onClick = {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
-                
-                // MiniPlayer slides and fades away as the full player slides up
-                AnimatedVisibility(
-                    visible = !isPlayerExpanded,
-                    enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
-                            slideInVertically(
-                                initialOffsetY = { it / 2 },
-                                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                            ),
-                    exit = fadeOut(animationSpec = tween(durationMillis = 150)) + 
-                           slideOutVertically(
-                               targetOffsetY = { it / 2 },
-                               animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                           ),
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    MiniPlayer(
-                        onPlayerClick = { isPlayerExpanded = true }
-                    )
+            ) { innerPadding ->
+                Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home.route,
+                        modifier = Modifier.fillMaxSize(),
+                        enterTransition = {
+                            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                            slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 12 }
+                        },
+                        exitTransition = {
+                            fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                            slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it / 12 }
+                        },
+                        popEnterTransition = {
+                            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                            slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { -it / 12 }
+                        },
+                        popExitTransition = {
+                            fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                            slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it / 12 }
+                        }
+                    ) {
+                        composable(Screen.Home.route) {
+                            HomeScreen(onPlaySong = { isPlayerExpanded = true })
+                        }
+                        composable(Screen.Search.route) {
+                            SearchScreen(
+                                isPlayerExpanded = isPlayerExpanded,
+                                onPlaySong = { isPlayerExpanded = true }
+                            )
+                        }
+                        composable(Screen.Library.route) {
+                            LibraryScreen(onPlaySong = { isPlayerExpanded = true })
+                        }
+                    }
+                    
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !isPlayerExpanded,
+                        enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
+                                slideInVertically(
+                                    initialOffsetY = { it / 2 },
+                                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                                ),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 150)) + 
+                               slideOutVertically(
+                                   targetOffsetY = { it / 2 },
+                                   animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                               ),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .then(
+                                if (isTablet) Modifier.padding(bottom = 16.dp).widthIn(max = 800.dp)
+                                else Modifier
+                            )
+                    ) {
+                        MiniPlayer(
+                            onPlayerClick = { isPlayerExpanded = true }
+                        )
+                    }
                 }
             }
         }
 
         // Full Player Screen (Slides up from the bottom, covering the whole screen including the navbar)
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = isPlayerExpanded,
             enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
                     slideInVertically(
