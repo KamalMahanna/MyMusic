@@ -238,29 +238,14 @@ class MusicPlayerManager @Inject constructor(
             }
         }
 
-        // Build MediaItem immediately so playback starts without waiting for artwork download.
-        // artworkUri is set for in-app display; artworkData (bitmap bytes) will be patched
-        // in once fetched — the system notification requires actual bytes, not a remote URL.
-        val mediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(song.name)
-                    .setArtist(song.primaryArtistNames)
-                    .setAlbumTitle(song.album.name)
-                    .setArtworkUri(artworkUri)
-                    .build()
-            )
-            .build()
-
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        player.play()
-        Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
+        _playbackState.value = PlaybackState(
+            currentSong = song,
+            isPlaying = true,
+            isBuffering = true
+        )
 
         cachingJob?.cancel()
         streamingCacheManager.cleanTempFiles()
-
         if (readableFile == null && cachedFile == null) {
             cachingJob = scope.launch {
                 Log.d(TAG, "Triggering background caching for song '${song.name}'")
@@ -268,47 +253,77 @@ class MusicPlayerManager @Inject constructor(
             }
         }
 
-        _playbackState.value = PlaybackState(
-            currentSong = song,
-            isPlaying = true,
-            isBuffering = true
-        )
-
-        // Fetch artwork bitmap in background and update MediaMetadata with raw bytes.
-        // The system media notification (lock screen / shade) cannot resolve remote HTTP
-        // URLs on its own — it needs the bitmap embedded directly as artworkData bytes.
         scope.launch {
+            // Fetch artwork with 150ms timeout to avoid delaying playback
             val artworkBitmap = withContext(Dispatchers.IO) {
                 try {
-                    when {
-                        localArtworkFile != null -> {
-                            BitmapFactory.decodeFile(localArtworkFile.absolutePath)
-                        }
-                        !song.highQualityImageUrl.isNullOrEmpty() -> {
-                            val loader = context.imageLoader
-                            val request = ImageRequest.Builder(context)
-                                .data(song.highQualityImageUrl)
-                                .allowHardware(false) // Must be non-hardware to extract bitmap
-                                .build()
-                            val result = loader.execute(request)
-                            if (result is SuccessResult) {
-                                result.image.toBitmap()
-                            } else {
-                                null
+                    withTimeoutOrNull(150) {
+                        when {
+                            localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
+                            song.highQualityImageUrl != null -> {
+                                val request = ImageRequest.Builder(context)
+                                    .data(song.highQualityImageUrl)
+                                    .allowHardware(false)
+                                    .build()
+                                (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
                             }
+                            else -> null
                         }
-                        else -> null
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to fetch artwork bitmap for notification: ${e.message}")
                     null
                 }
             }
 
-            if (artworkBitmap != null) {
-                // Only update if this song is still the active one
-                if (_playbackState.value.currentSong?.id == song.id) {
-                    updateArtworkMetadata(player, artworkBitmap, song)
+            val artworkBytes = artworkBitmap?.let { bitmap ->
+                try {
+                    ByteArrayOutputStream().use { stream ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                        stream.toByteArray()
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            val metadataBuilder = MediaMetadata.Builder()
+                .setTitle(song.name)
+                .setArtist(song.primaryArtistNames)
+                .setAlbumTitle(song.album.name)
+                .setArtworkUri(artworkUri)
+            if (artworkBytes != null) {
+                metadataBuilder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            }
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(uri)
+                .setMediaMetadata(metadataBuilder.build())
+                .build()
+
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.play()
+            Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked (hasArtworkData=${artworkBytes != null})")
+
+            // Fallback: If artwork timed out, fetch it fully in background and patch metadata
+            if (artworkBitmap == null && song.highQualityImageUrl != null) {
+                launch(Dispatchers.IO) {
+                    try {
+                        val request = ImageRequest.Builder(context)
+                            .data(song.highQualityImageUrl)
+                            .allowHardware(false)
+                            .build()
+                        val result = (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
+                        if (result != null) {
+                            withContext(Dispatchers.Main) {
+                                if (_playbackState.value.currentSong?.id == song.id) {
+                                    updateArtworkMetadata(player, result, song)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Fallback artwork fetch failed: ${e.message}")
+                    }
                 }
             }
 
@@ -538,35 +553,6 @@ class MusicPlayerManager @Inject constructor(
                     lastSong.highQualityImageUrl?.let { android.net.Uri.parse(it) }
                 }
 
-                val mediaItem = MediaItem.Builder()
-                    .setUri(uri)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(lastSong.name)
-                            .setArtist(lastSong.primaryArtistNames)
-                            .setAlbumTitle(lastSong.album.name)
-                            .setArtworkUri(artworkUri)
-                            .build()
-                    )
-                    .build()
-
-                player.setMediaItem(mediaItem)
-                
-                val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
-                val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
-                if (savedPos > 0) {
-                    player.seekTo(savedPos)
-                }
-                player.prepare()
-
-                _playbackState.value = PlaybackState(
-                    currentSong = lastSong,
-                    isPlaying = false,
-                    isBuffering = false,
-                    currentPosition = savedPos,
-                    duration = 0L
-                )
-
                 scope.launch {
                     val artworkBitmap = withContext(Dispatchers.IO) {
                         try {
@@ -577,8 +563,7 @@ class MusicPlayerManager @Inject constructor(
                                         .data(lastSong.highQualityImageUrl)
                                         .allowHardware(false)
                                         .build()
-                                    val result = (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
-                                    result
+                                    (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
                                 }
                                 else -> null
                             }
@@ -588,11 +573,47 @@ class MusicPlayerManager @Inject constructor(
                         }
                     }
 
-                    if (artworkBitmap != null) {
-                        if (queueManager.currentSong?.id == lastSong.id) {
-                            updateArtworkMetadata(player, artworkBitmap, lastSong)
+                    val artworkBytes = artworkBitmap?.let { bitmap ->
+                        try {
+                            ByteArrayOutputStream().use { stream ->
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                                stream.toByteArray()
+                            }
+                        } catch (e: Exception) {
+                            null
                         }
                     }
+
+                    val metadataBuilder = MediaMetadata.Builder()
+                        .setTitle(lastSong.name)
+                        .setArtist(lastSong.primaryArtistNames)
+                        .setAlbumTitle(lastSong.album.name)
+                        .setArtworkUri(artworkUri)
+                    if (artworkBytes != null) {
+                        metadataBuilder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    }
+
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(uri)
+                        .setMediaMetadata(metadataBuilder.build())
+                        .build()
+
+                    player.setMediaItem(mediaItem)
+                    
+                    val sharedPreferences = context.getSharedPreferences("metro_music_playback_prefs", Context.MODE_PRIVATE)
+                    val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
+                    if (savedPos > 0) {
+                        player.seekTo(savedPos)
+                    }
+                    player.prepare()
+
+                    _playbackState.value = PlaybackState(
+                        currentSong = lastSong,
+                        isPlaying = false,
+                        isBuffering = false,
+                        currentPosition = savedPos,
+                        duration = 0L
+                    )
                 }
             }
         }
