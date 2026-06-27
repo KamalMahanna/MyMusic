@@ -56,7 +56,7 @@ fun SongListItem(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(song.highQualityImageUrl)
+                .data(song.mediumQualityImageUrl)
                 .crossfade(true)
                 .build(),
             contentDescription = "Song Artwork",

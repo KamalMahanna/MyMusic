@@ -59,7 +59,7 @@ fun MiniPlayer(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(currentSong.highQualityImageUrl)
+                    .data(currentSong.mediumQualityImageUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = "Artwork",

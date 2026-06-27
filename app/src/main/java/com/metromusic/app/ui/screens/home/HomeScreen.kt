@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -87,20 +89,17 @@ fun HomeScreen(
                                         .width(120.dp)
                                         .clickable { viewModel.playModuleItem(item) }
                                 ) {
-                                    SubcomposeAsyncImage(
-                                        model = item.highQualityImageUrl,
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(item.mediumQualityImageUrl)
+                                            .crossfade(true)
+                                            .build(),
                                         contentDescription = item.name,
                                         contentScale = ContentScale.Crop,
-                                        loading = {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            )
-                                        },
                                         modifier = Modifier
                                             .size(120.dp)
                                             .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
@@ -199,20 +198,17 @@ private fun PlaylistSheetContent(
                 .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SubcomposeAsyncImage(
-                model = playlist.highQualityImageUrl,
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(playlist.mediumQualityImageUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = playlist.name,
                 contentScale = ContentScale.Crop,
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                },
                 modifier = Modifier
                     .size(72.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
@@ -304,20 +300,17 @@ private fun AlbumSheetContent(
                 .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SubcomposeAsyncImage(
-                model = album.highQualityImageUrl,
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(album.mediumQualityImageUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = album.name,
                 contentScale = ContentScale.Crop,
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                },
                 modifier = Modifier
                     .size(72.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {

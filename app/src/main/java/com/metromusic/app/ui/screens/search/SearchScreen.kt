@@ -141,7 +141,7 @@ fun SearchScreen(
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(artist.highQualityImageUrl)
+                                    .data(artist.mediumQualityImageUrl)
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = artist.name,
@@ -190,7 +190,7 @@ fun SearchScreen(
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(artistDetail.highQualityImageUrl)
+                            .data(artistDetail.mediumQualityImageUrl)
                             .crossfade(true)
                             .build(),
                         contentDescription = artistDetail.name,

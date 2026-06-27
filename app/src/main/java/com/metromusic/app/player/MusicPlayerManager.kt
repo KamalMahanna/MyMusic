@@ -22,6 +22,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import android.graphics.drawable.BitmapDrawable
 
 data class PlaybackState(
     val currentSong: Song? = null,
@@ -245,13 +249,16 @@ class MusicPlayerManager @Inject constructor(
                             BitmapFactory.decodeFile(localArtworkFile.absolutePath)
                         }
                         !song.highQualityImageUrl.isNullOrEmpty() -> {
-                            val url = java.net.URL(song.highQualityImageUrl)
-                            val connection = url.openConnection().apply {
-                                connectTimeout = 5000
-                                readTimeout = 5000
-                            }
-                            connection.getInputStream().use { stream ->
-                                BitmapFactory.decodeStream(stream)
+                            val loader = context.imageLoader
+                            val request = ImageRequest.Builder(context)
+                                .data(song.highQualityImageUrl)
+                                .allowHardware(false) // Must be non-hardware to extract bitmap
+                                .build()
+                            val result = loader.execute(request)
+                            if (result is SuccessResult) {
+                                (result.drawable as? BitmapDrawable)?.bitmap
+                            } else {
+                                null
                             }
                         }
                         else -> null

@@ -62,6 +62,16 @@ data class Song(
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
     
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
+    
     val highQualityDownloadUrl: String?
         get() = downloadUrl.find { it.quality == "320kbps" }?.url
             ?: downloadUrl.lastOrNull()?.url
@@ -105,6 +115,16 @@ data class SearchArtist(
 ) {
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
+
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -125,6 +145,16 @@ data class ArtistDetail(
 ) {
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
+
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -145,6 +175,16 @@ data class Album(
 ) {
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
+
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -164,6 +204,16 @@ data class Playlist(
 ) {
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
+
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
 }
 
 @JsonClass(generateAdapter = true)
@@ -178,6 +228,16 @@ data class ModuleItem(
 ) {
     val highQualityImageUrl: String?
         get() = image.lastOrNull()?.url
+
+    val mediumQualityImageUrl: String?
+        get() = image.find { it.quality == "150x150" }?.url
+            ?: image.getOrNull(1)?.url
+            ?: highQualityImageUrl
+
+    val lowQualityImageUrl: String?
+        get() = image.find { it.quality == "50x50" }?.url
+            ?: image.firstOrNull()?.url
+            ?: mediumQualityImageUrl
 }
 
 @JsonClass(generateAdapter = true)
