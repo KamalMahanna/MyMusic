@@ -312,6 +312,27 @@ class MusicPlayerManager @Inject constructor(
         }
     }
 
+    fun setLoadingSong(song: Song) {
+        Log.d(TAG, "setLoadingSong: songId='${song.id}', name='${song.name}'")
+        exoPlayer?.stop()
+        _playbackState.value = PlaybackState(
+            currentSong = song,
+            isPlaying = false,
+            isBuffering = true
+        )
+    }
+
+    fun clearLoadingState(songId: String) {
+        Log.d(TAG, "clearLoadingState: songId='$songId'")
+        if (_playbackState.value.currentSong?.id == songId && _playbackState.value.isBuffering) {
+            _playbackState.value = PlaybackState(
+                currentSong = null,
+                isPlaying = false,
+                isBuffering = false
+            )
+        }
+    }
+
     fun playSongFromQueue(songs: List<Song>, index: Int) {
         Log.d(TAG, "playSongFromQueue: index=$index, size=${songs.size}")
         queueManager.setQueue(songs, index)

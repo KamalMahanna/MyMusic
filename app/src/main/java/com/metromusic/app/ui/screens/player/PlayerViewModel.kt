@@ -57,6 +57,15 @@ class PlayerViewModel @Inject constructor(
             initialValue = false
         )
 
+    val isBuffering: StateFlow<Boolean> = musicPlayerManager.playbackState
+        .map { it.isBuffering }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     val activeDownloadSongId: StateFlow<String?> = songDownloader.downloadState
         .map { if (it.isDownloading) it.songId else null }
         .distinctUntilChanged()

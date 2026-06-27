@@ -92,7 +92,12 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .animateItem()
                                         .width(120.dp)
-                                        .clickable { viewModel.playModuleItem(item) }
+                                        .clickable {
+                                            if (item.type.lowercase().trim() == "song") {
+                                                onPlaySong()
+                                            }
+                                            viewModel.playModuleItem(item)
+                                        }
                                 ) {
                                     AsyncImage(
                                         model = item.mediumQualityImageUrl,
@@ -127,17 +132,7 @@ fun HomeScreen(
             }
         }
 
-        if (uiState.isItemLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f))
-                    .clickable(enabled = false) {}, // Block clicks underneath
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
+
 
         if (uiState.selectedPlaylist != null) {
             ModalBottomSheet(
@@ -231,8 +226,17 @@ private fun PlaylistSheetContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        val songs = playlist.songs ?: emptyList()
-        if (songs.isEmpty()) {
+        val songs = playlist.songs
+        if (songs == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (songs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -339,8 +343,17 @@ private fun AlbumSheetContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        val songs = album.songs ?: emptyList()
-        if (songs.isEmpty()) {
+        val songs = album.songs
+        if (songs == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (songs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -32,6 +32,7 @@ fun MiniPlayer(
 ) {
     val song by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val isBuffering by viewModel.isBuffering.collectAsState()
 
     val currentSong = song ?: return
 
@@ -86,13 +87,25 @@ fun MiniPlayer(
             
             Spacer(modifier = Modifier.width(12.dp))
             
-            IconButton(
-                onClick = { viewModel.togglePlayPause() }
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Play/Pause"
-                )
+            if (isBuffering) {
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = { viewModel.togglePlayPause() }
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play/Pause"
+                    )
+                }
             }
             
             IconButton(
