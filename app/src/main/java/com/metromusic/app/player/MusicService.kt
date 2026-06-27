@@ -15,11 +15,18 @@ import androidx.media3.session.MediaSessionService
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.metromusic.app.MainActivity
+import androidx.media3.session.SessionResult
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MusicService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     @Inject
     lateinit var musicPlayerManager: MusicPlayerManager
@@ -42,6 +49,7 @@ class MusicService : MediaSessionService() {
         )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
+            .setCallback(CustomSessionCallback())
             .build()
         Log.d(TAG, "MediaSession successfully built and set up")
     }
@@ -100,6 +108,7 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() service stopping")
+        scope.cancel()
         mediaSession?.run {
             Log.d(TAG, "Releasing MediaSession")
             release()
@@ -120,6 +129,45 @@ class MusicService : MediaSessionService() {
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
+        }
+    }
+
+    private inner class CustomSessionCallback : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val connectionResult = super.onConnect(session, controller)
+            val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
+            val availablePlayerCommands = connectionResult.availablePlayerCommands.buildUpon()
+                .add(Player.COMMAND_SEEK_TO_NEXT)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .build()
+            return MediaSession.ConnectionResult.accept(
+                availableSessionCommands.build(),
+                availablePlayerCommands
+            )
+        }
+
+        @Suppress("DEPRECATION")
+        override fun onPlayerCommandRequest(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            playerCommand: Int
+        ): Int {
+            if (playerCommand == Player.COMMAND_SEEK_TO_NEXT || playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM) {
+                scope.launch {
+                    musicPlayerManager.playNext()
+                }
+                return SessionResult.RESULT_SUCCESS
+            }
+            if (playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS || playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) {
+                musicPlayerManager.playPrevious()
+                return SessionResult.RESULT_SUCCESS
+            }
+            return super.onPlayerCommandRequest(session, controller, playerCommand)
         }
     }
 
