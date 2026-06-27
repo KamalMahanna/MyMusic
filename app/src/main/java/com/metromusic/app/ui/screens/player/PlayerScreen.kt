@@ -16,6 +16,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -537,103 +538,135 @@ fun QueueView(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
     ) {
-        LazyColumn(
-            state = listState,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f),
-            flingBehavior = rememberFrictionFlingBehavior()
-        ) {
-            itemsIndexed(
-                items = queue,
-                key = { index, song -> "${song.id}_$index" }
-            ) { index, song ->
-                val dismissState = rememberSwipeToDismissBoxState(
-                    confirmValueChange = { value ->
-                        if (value == SwipeToDismissBoxValue.StartToEnd) {
-                            viewModel.removeFromQueue(index)
-                            true
-                        } else false
-                    }
-                )
-
-                SwipeToDismissBox(
-                    state = dismissState,
-                    enableDismissFromStartToEnd = true,
-                    enableDismissFromEndToStart = false,
-                    backgroundContent = {
-                        val color = when (dismissState.targetValue) {
-                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
-                            else -> MaterialTheme.colorScheme.surface
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(color)
-                                .padding(horizontal = 20.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                else MaterialTheme.colorScheme.surface
-                            )
-                            .clickable { viewModel.playQueueIndex(index) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = song.mediumQualityImageUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(4.dp))
+        if (queue.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { dragOffsetY = 0f },
+                            onDragEnd = { dragOffsetY = 0f },
+                            onDragCancel = { dragOffsetY = 0f },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                if (dragAmount > 0) {
+                                    dragOffsetY += dragAmount
+                                    if (dragOffsetY > swipeThresholdPx) {
+                                        onSwipeDown()
+                                        dragOffsetY = 0f
+                                    }
+                                }
+                            }
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = song.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = song.primaryArtistNames,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Queue is empty",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+                flingBehavior = rememberFrictionFlingBehavior()
+            ) {
+                itemsIndexed(
+                    items = queue,
+                    key = { index, song -> "${song.id}_$index" }
+                ) { index, song ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                viewModel.removeFromQueue(index)
+                                true
+                            } else false
                         }
-                        
-                        if (index == currentIndex) {
-                            Icon(
-                                imageVector = Icons.Default.VolumeUp,
-                                contentDescription = "Playing",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(12.dp)
+                    )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = true,
+                        enableDismissFromEndToStart = false,
+                        backgroundContent = {
+                            val color = when (dismissState.targetValue) {
+                                SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
+                                else -> MaterialTheme.colorScheme.surface
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(color)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .clickable { viewModel.playQueueIndex(index) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = song.mediumQualityImageUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(4.dp))
                             )
-                        } else {
-                            val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
-                            SongDownloadIndicator(
-                                songId = song.id,
-                                playerViewModel = viewModel,
-                                isDownloaded = isDownloaded,
-                                onDownloadClick = { viewModel.downloadSong(song) }
-                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = song.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = song.primaryArtistNames,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            
+                            if (index == currentIndex) {
+                                Icon(
+                                    imageVector = Icons.Default.VolumeUp,
+                                    contentDescription = "Playing",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            } else {
+                                val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
+                                SongDownloadIndicator(
+                                    songId = song.id,
+                                    playerViewModel = viewModel,
+                                    isDownloaded = isDownloaded,
+                                    onDownloadClick = { viewModel.downloadSong(song) }
+                                )
+                            }
                         }
                     }
                 }
