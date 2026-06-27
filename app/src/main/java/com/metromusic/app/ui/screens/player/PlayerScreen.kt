@@ -39,9 +39,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import coil.compose.AsyncImage
 import com.metromusic.app.data.model.Song
 import com.metromusic.app.player.QueueManager
+import com.metromusic.app.ui.components.SongDownloadIndicator
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -230,7 +233,10 @@ fun PlayerScreen(
 
                             // Large Artwork
                             AsyncImage(
-                                model = currentSong.highQualityImageUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(currentSong.highQualityImageUrl)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = "Artwork",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -272,25 +278,10 @@ fun PlayerScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
 
                                 // Download Button
-                                val isDownloading = downloadState.songId == currentSong.id && downloadState.isDownloading
-                                val isDownloaded = viewModel.isSongDownloaded(currentSong)
-                                
-                                if (isDownloading) {
-                                    CircularProgressIndicator(
-                                        progress = { downloadState.progress },
-                                        modifier = Modifier.size(28.dp),
-                                        strokeWidth = 3.dp
-                                    )
-                                } else {
-                                    IconButton(onClick = { viewModel.downloadSong(currentSong) }) {
-                                        Icon(
-                                            imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                                            contentDescription = "Download High Quality 320kbps",
-                                            modifier = Modifier.size(28.dp),
-                                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                                        )
-                                    }
-                                }
+                                PlayerScreenDownloadButton(
+                                    song = currentSong,
+                                    viewModel = viewModel
+                                )
                             }
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -388,7 +379,7 @@ fun QueueView(
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
-    val downloadState by viewModel.downloadState.collectAsState()
+    val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
     val listState = rememberLazyListState()
 
     // Detect if we are scrolled to the top
@@ -491,7 +482,10 @@ fun QueueView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AsyncImage(
-                            model = song.highQualityImageUrl,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(song.highQualityImageUrl)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -524,24 +518,13 @@ fun QueueView(
                                 modifier = Modifier.padding(12.dp)
                             )
                         } else {
-                            val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                            val isDownloaded = viewModel.isSongDownloaded(song)
-
-                            if (isDownloading) {
-                                CircularProgressIndicator(
-                                    progress = { downloadState.progress },
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.5.dp
-                                )
-                            } else {
-                                IconButton(onClick = { viewModel.downloadSong(song) }) {
-                                    Icon(
-                                        imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
-                                        contentDescription = "Download",
-                                        tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
+                            val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
+                            SongDownloadIndicator(
+                                songId = song.id,
+                                playerViewModel = viewModel,
+                                isDownloaded = isDownloaded,
+                                onDownloadClick = { viewModel.downloadSong(song) }
+                            )
                         }
                     }
                 }
@@ -550,6 +533,36 @@ fun QueueView(
     }
 }
 
+@Composable
+private fun PlayerScreenDownloadButton(
+    song: Song,
+    viewModel: PlayerViewModel,
+    modifier: Modifier = Modifier
+) {
+    val downloadState by viewModel.downloadState.collectAsState()
+    val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
+    val isDownloaded = remember(song.id) { viewModel.isSongDownloaded(song) }
+
+    if (isDownloading) {
+        CircularProgressIndicator(
+            progress = { downloadState.progress },
+            modifier = modifier.size(28.dp),
+            strokeWidth = 3.dp
+        )
+    } else {
+        IconButton(
+            onClick = { viewModel.downloadSong(song) },
+            modifier = modifier
+        ) {
+            Icon(
+                imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                contentDescription = "Download High Quality 320kbps",
+                modifier = Modifier.size(28.dp),
+                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+            )
+        }
+    }
+}
 
 private fun formatMillis(millis: Long): String {
     val totalSeconds = millis / 1000

@@ -1,5 +1,7 @@
 package com.metromusic.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,10 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
 @Composable
@@ -28,12 +32,10 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
-    val playbackState by viewModel.playbackState.collectAsState()
-    val song = playbackState.currentSong ?: return
+    val song by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
-    val progress = if (playbackState.duration > 0) {
-        playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
-    } else 0f
+    val currentSong = song ?: return
 
     Box(
         modifier = modifier
@@ -43,17 +45,11 @@ fun MiniPlayer(
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onPlayerClick() }
     ) {
-        // Progress background overlay
-        Box(
+        // Progress overlay — isolated composable so only IT recomposes every 500ms.
+        MiniPlayerProgress(
+            viewModel = viewModel,
             modifier = Modifier.matchParentSize()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-            )
-        }
+        )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -62,7 +58,10 @@ fun MiniPlayer(
                 .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
         ) {
             AsyncImage(
-                model = song.highQualityImageUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(currentSong.highQualityImageUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = "Artwork",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -76,13 +75,13 @@ fun MiniPlayer(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = song.name,
+                    text = currentSong.name,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = song.primaryArtistNames,
+                    text = currentSong.primaryArtistNames,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -96,7 +95,7 @@ fun MiniPlayer(
                 onClick = { viewModel.togglePlayPause() }
             ) {
                 Icon(
-                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = "Play/Pause"
                 )
             }
@@ -110,5 +109,36 @@ fun MiniPlayer(
                 )
             }
         }
+    }
+}
+
+/**
+ * Isolated composable for the MiniPlayer progress background overlay.
+ * Only this function collects playbackState and recomposes on every 500ms playback tick,
+ * preventing the entire MiniPlayer (artwork, title, buttons) from recomposing.
+ */
+@Composable
+private fun MiniPlayerProgress(
+    viewModel: PlayerViewModel,
+    modifier: Modifier = Modifier
+) {
+    val playbackState by viewModel.playbackState.collectAsState()
+    val rawProgress = if (playbackState.duration > 0) {
+        playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()
+    } else 0f
+
+    val progress by animateFloatAsState(
+        targetValue = rawProgress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 500),
+        label = "MiniPlayerProgress"
+    )
+
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(progress)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+        )
     }
 }

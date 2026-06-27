@@ -2,6 +2,8 @@ package com.metromusic.app.player
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -16,6 +18,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,12 +34,14 @@ data class PlaybackState(
 class MusicPlayerManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queueManager: QueueManager,
-    private val downloadRepository: DownloadRepository
+    private val downloadRepository: DownloadRepository,
+    private val streamingCacheManager: StreamingCacheManager
 ) {
     private var exoPlayer: ExoPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var progressJob: Job? = null
     private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
+    private var cachingJob: Job? = null
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -136,6 +141,7 @@ class MusicPlayerManager @Inject constructor(
         }
 
         val readableFile = downloadRepository.getReadableFileForSong(song)
+        val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
         
         val uri = when {
             song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
@@ -147,19 +153,30 @@ class MusicPlayerManager @Inject constructor(
                     else song.url
                 } else {
                     Log.w(TAG, "Local file from song.url does not exist or is unreadable: $filePath. Falling back to other sources.")
-                    if (readableFile != null) {
-                        Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
-                        android.net.Uri.fromFile(readableFile).toString()
-                    } else {
-                        val dlUrl = song.highQualityDownloadUrl
-                        Log.d(TAG, "Using high quality download URL: $dlUrl")
-                        dlUrl ?: return
+                    when {
+                        readableFile != null -> {
+                            Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
+                            android.net.Uri.fromFile(readableFile).toString()
+                        }
+                        cachedFile != null -> {
+                            Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
+                            android.net.Uri.fromFile(cachedFile).toString()
+                        }
+                        else -> {
+                            val dlUrl = song.highQualityDownloadUrl
+                            Log.d(TAG, "Using high quality download URL: $dlUrl")
+                            dlUrl ?: return
+                        }
                     }
                 }
             }
             readableFile != null -> {
                 Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
                 android.net.Uri.fromFile(readableFile).toString()
+            }
+            cachedFile != null -> {
+                Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
+                android.net.Uri.fromFile(cachedFile).toString()
             }
             else -> {
                 val dlUrl = song.highQualityDownloadUrl
@@ -179,6 +196,9 @@ class MusicPlayerManager @Inject constructor(
             }
         }
 
+        // Build MediaItem immediately so playback starts without waiting for artwork download.
+        // artworkUri is set for in-app display; artworkData (bitmap bytes) will be patched
+        // in once fetched — the system notification requires actual bytes, not a remote URL.
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
@@ -196,18 +216,89 @@ class MusicPlayerManager @Inject constructor(
         player.play()
         Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
 
+        cachingJob?.cancel()
+        streamingCacheManager.cleanTempFiles()
+
+        if (readableFile == null && cachedFile == null) {
+            cachingJob = scope.launch {
+                Log.d(TAG, "Triggering background caching for song '${song.name}'")
+                streamingCacheManager.cacheSong(song)
+            }
+        }
+
         _playbackState.value = PlaybackState(
             currentSong = song,
             isPlaying = true,
             isBuffering = true
         )
 
-        // Check if we need more suggestions
+        // Fetch artwork bitmap in background and update MediaMetadata with raw bytes.
+        // The system media notification (lock screen / shade) cannot resolve remote HTTP
+        // URLs on its own — it needs the bitmap embedded directly as artworkData bytes.
         scope.launch {
+            val artworkBitmap = withContext(Dispatchers.IO) {
+                try {
+                    when {
+                        localArtworkFile != null -> {
+                            BitmapFactory.decodeFile(localArtworkFile.absolutePath)
+                        }
+                        !song.highQualityImageUrl.isNullOrEmpty() -> {
+                            val url = java.net.URL(song.highQualityImageUrl)
+                            val connection = url.openConnection().apply {
+                                connectTimeout = 5000
+                                readTimeout = 5000
+                            }
+                            connection.getInputStream().use { stream ->
+                                BitmapFactory.decodeStream(stream)
+                            }
+                        }
+                        else -> null
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to fetch artwork bitmap for notification: ${e.message}")
+                    null
+                }
+            }
+
+            if (artworkBitmap != null) {
+                // Only update if this song is still the active one
+                if (_playbackState.value.currentSong?.id == song.id) {
+                    updateArtworkMetadata(player, artworkBitmap, song)
+                }
+            }
+
+            // Check if we need more suggestions
             if (queueManager.isNearEnd()) {
                 Log.d(TAG, "Queue is near the end, loading suggestions")
                 queueManager.loadMoreSuggestions()
             }
+        }
+    }
+
+    /**
+     * Updates the current MediaItem's metadata with the fetched [bitmap] as raw JPEG bytes.
+     * This is required for the system media notification (lock screen / notification shade)
+     * to display album art — it cannot load remote HTTP URLs itself.
+     */
+    private fun updateArtworkMetadata(player: ExoPlayer, bitmap: Bitmap, song: Song) {
+        try {
+            val bytes = ByteArrayOutputStream().use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                stream.toByteArray()
+            }
+            val updatedMetadata = player.mediaMetadata
+                .buildUpon()
+                .setArtworkData(bytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                .build()
+            player.replaceMediaItem(
+                player.currentMediaItemIndex,
+                player.currentMediaItem!!.buildUpon()
+                    .setMediaMetadata(updatedMetadata)
+                    .build()
+            )
+            Log.d(TAG, "Artwork metadata updated for '${song.name}' (${bytes.size} bytes)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to update artwork metadata: ${e.message}")
         }
     }
 
@@ -303,6 +394,7 @@ class MusicPlayerManager @Inject constructor(
     fun release() {
         Log.d(TAG, "release() invoked")
         stopProgressUpdate()
+        cachingJob?.cancel()
         scope.cancel()
         audioDeviceCallback?.let { callback ->
             try {

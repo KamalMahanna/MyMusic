@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,6 +26,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import com.metromusic.app.ui.components.SongListItem
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -36,9 +39,9 @@ fun SearchScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val downloadState by playerViewModel.downloadState.collectAsState()
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
-    val playbackState by playerViewModel.playbackState.collectAsState()
+    val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
+    val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -95,35 +98,48 @@ fun SearchScreen(
                 Text(text = "Error: ${uiState.error}")
             }
         } else {
+            val listState = rememberLazyListState()
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 if (uiState.filter == SearchFilter.SONGS) {
-                    items(uiState.songs) { song ->
-                        val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                        val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
-                        val isPlaying = playbackState.currentSong?.id == song.id
+                    itemsIndexed(
+                        items = uiState.songs,
+                        key = { _, song -> song.id }
+                    ) { index, song ->
+                        val isDownloading = activeDownloadSongId == song.id
+                        val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                        val isPlaying = currentPlayingSongId == song.id
                         SongListItem(
                             song = song,
-                            onClick = { playerViewModel.playSongFromList(uiState.songs, uiState.songs.indexOf(song)) },
+                            onClick = { playerViewModel.playSongFromList(uiState.songs, index) },
                             onDownloadClick = { playerViewModel.downloadSong(song) },
                             isDownloaded = isDownloaded,
                             isDownloading = isDownloading,
-                            isPlaying = isPlaying
+                            isPlaying = isPlaying,
+                            modifier = Modifier.animateItem()
                         )
                     }
                 } else {
-                    items(uiState.artists) { artist ->
+                    items(
+                        items = uiState.artists,
+                        key = { artist -> artist.id }
+                    ) { artist ->
                         Row(
                             modifier = Modifier
+                                .animateItem()
                                 .fillMaxWidth()
                                 .clickable { viewModel.selectArtist(artist.id) }
                                 .padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AsyncImage(
-                                model = artist.highQualityImageUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(artist.highQualityImageUrl)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = artist.name,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -154,7 +170,7 @@ fun SearchScreen(
     if (uiState.selectedArtistDetail != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.clearSelectedArtist() },
-            sheetState = rememberModalBottomSheetState()
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             val artistDetail = uiState.selectedArtistDetail!!
             Column(
@@ -169,7 +185,10 @@ fun SearchScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model = artistDetail.highQualityImageUrl,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(artistDetail.highQualityImageUrl)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = artistDetail.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -220,10 +239,13 @@ fun SearchScreen(
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
-                        itemsIndexed(topSongs) { index, song ->
-                            val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
-                            val isDownloaded = remember(downloadedSongs, song) { playerViewModel.isSongDownloaded(song) }
-                            val isPlaying = playbackState.currentSong?.id == song.id
+                        itemsIndexed(
+                            items = topSongs,
+                            key = { _, song -> song.id }
+                        ) { index, song ->
+                            val isDownloading = activeDownloadSongId == song.id
+                            val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                            val isPlaying = currentPlayingSongId == song.id
                             SongListItem(
                                 song = song,
                                 onClick = { playerViewModel.playSongFromList(topSongs, index) },

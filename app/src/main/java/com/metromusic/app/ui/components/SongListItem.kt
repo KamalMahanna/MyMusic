@@ -1,5 +1,7 @@
 package com.metromusic.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,12 +11,15 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import coil.compose.AsyncImage
 import com.metromusic.app.data.model.Song
 
@@ -31,20 +36,29 @@ fun SongListItem(
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false
 ) {
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isPlaying)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        else
+            androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = tween(durationMillis = 300),
+        label = "SongItemBg"
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else androidx.compose.ui.graphics.Color.Transparent
-            )
+            .background(animatedBgColor)
             .clickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = song.highQualityImageUrl,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(song.highQualityImageUrl)
+                .crossfade(true)
+                .build(),
             contentDescription = "Song Artwork",
             contentScale = ContentScale.Crop,
             modifier = Modifier

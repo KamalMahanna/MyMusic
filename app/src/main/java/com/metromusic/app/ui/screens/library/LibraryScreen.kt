@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
@@ -18,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import coil.compose.AsyncImage
 import com.metromusic.app.ui.screens.player.PlayerViewModel
 
@@ -35,7 +38,9 @@ fun LibraryScreen(
         return
     }
 
+    val listState = rememberLazyListState()
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
@@ -46,9 +51,13 @@ fun LibraryScreen(
                 modifier = Modifier.padding(16.dp)
             )
         }
-        items(songs) { song ->
+        items(
+            items = songs,
+            key = { song -> song.id }
+        ) { song ->
             Row(
                 modifier = Modifier
+                    .animateItem()
                     .fillMaxWidth()
                     .clickable {
                         val songList = viewModel.getAsSongList()
@@ -62,7 +71,10 @@ fun LibraryScreen(
             ) {
                 if (!song.imageUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = song.imageUrl,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(song.imageUrl)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = "Song Artwork",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

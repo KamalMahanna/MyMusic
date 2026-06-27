@@ -8,6 +8,11 @@ import com.metromusic.app.download.SongDownloader
 import com.metromusic.app.player.MusicPlayerManager
 import com.metromusic.app.player.QueueManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,6 +29,42 @@ class PlayerViewModel @Inject constructor(
     val queue = queueManager.queue
     val queueIndex = queueManager.currentIndex
     val downloadedSongs = downloadRepository.downloadedSongs
+
+    val currentSong: StateFlow<Song?> = musicPlayerManager.playbackState
+        .map { it.currentSong }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val currentSongId: StateFlow<String?> = musicPlayerManager.playbackState
+        .map { it.currentSong?.id }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val isPlaying: StateFlow<Boolean> = musicPlayerManager.playbackState
+        .map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    val activeDownloadSongId: StateFlow<String?> = songDownloader.downloadState
+        .map { if (it.isDownloading) it.songId else null }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
     fun playSongFromList(songs: List<Song>, index: Int) {
         musicPlayerManager.playSongFromQueue(songs, index)
