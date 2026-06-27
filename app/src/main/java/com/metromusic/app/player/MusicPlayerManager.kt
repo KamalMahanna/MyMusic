@@ -12,6 +12,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.metromusic.app.data.model.Song
+import androidx.media3.common.ForwardingPlayer
 import com.metromusic.app.data.repository.DownloadRepository
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -44,6 +45,7 @@ class MusicPlayerManager @Inject constructor(
     private val streamingCacheManager: StreamingCacheManager
 ) {
     private var exoPlayer: ExoPlayer? = null
+    private var forwardingPlayer: Player? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var progressJob: Job? = null
     private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
@@ -52,12 +54,15 @@ class MusicPlayerManager @Inject constructor(
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
-    fun getPlayer(): ExoPlayer {
+    fun getPlayer(): Player {
         return getOrCreatePlayer()
     }
 
-    private fun getOrCreatePlayer(): ExoPlayer {
-        return exoPlayer ?: ExoPlayer.Builder(context)
+    private fun getOrCreatePlayer(): Player {
+        val player = exoPlayer
+        if (player != null) return forwardingPlayer ?: player
+
+        val newExoPlayer = ExoPlayer.Builder(context)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -134,6 +139,35 @@ class MusicPlayerManager @Inject constructor(
                 audioDeviceCallback = callback
                 restoreLastPlayedSong(player)
             }
+
+        val newForwardingPlayer = object : ForwardingPlayer(newExoPlayer) {
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build()
+            }
+
+            override fun seekToNext() {
+                scope.launch { playNext() }
+            }
+
+            override fun seekToNextMediaItem() {
+                scope.launch { playNext() }
+            }
+
+            override fun seekToPrevious() {
+                playPrevious()
+            }
+
+            override fun seekToPreviousMediaItem() {
+                playPrevious()
+            }
+        }
+        forwardingPlayer = newForwardingPlayer
+        return newForwardingPlayer
     }
 
     fun playSong(song: Song) {
@@ -291,7 +325,7 @@ class MusicPlayerManager @Inject constructor(
      * This is required for the system media notification (lock screen / notification shade)
      * to display album art — it cannot load remote HTTP URLs itself.
      */
-    private fun updateArtworkMetadata(player: ExoPlayer, bitmap: Bitmap, song: Song) {
+    private fun updateArtworkMetadata(player: Player, bitmap: Bitmap, song: Song) {
         try {
             val bytes = ByteArrayOutputStream().use { stream ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
@@ -466,9 +500,10 @@ class MusicPlayerManager @Inject constructor(
         audioDeviceCallback = null
         exoPlayer?.release()
         exoPlayer = null
+        forwardingPlayer = null
     }
 
-    private fun restoreLastPlayedSong(player: ExoPlayer) {
+    private fun restoreLastPlayedSong(player: Player) {
         val lastSong = queueManager.currentSong
         if (lastSong != null) {
             Log.d(TAG, "restoreLastPlayedSong: found song '${lastSong.name}' in queue manager, restoring to ExoPlayer")
