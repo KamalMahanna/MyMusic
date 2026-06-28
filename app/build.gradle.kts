@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.metromusic.app"
+    namespace = "com.mymusic.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.metromusic.app"
+        applicationId = "com.mymusic.app"
         minSdk = 24
         targetSdk = 35
         
