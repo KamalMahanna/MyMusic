@@ -61,6 +61,15 @@ import com.mymusic.app.ui.screens.home.HomeScreen
 import com.mymusic.app.ui.screens.library.LibraryScreen
 import com.mymusic.app.ui.screens.search.SearchScreen
 import com.mymusic.app.ui.screens.player.PlayerScreen
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Home", Icons.Rounded.Home)
@@ -218,93 +227,127 @@ fun CustomBottomNavigation(
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left floating pill-shaped container (Home and Library)
         Row(
             modifier = Modifier
-                .weight(1f)
                 .height(64.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val pillItems = listOf(Screen.Home, Screen.Library)
-            pillItems.forEach { screen ->
+            items.forEach { screen ->
                 val isSelected = currentRoute == screen.route
-                
-                // Active item gets primary color pill container with onPrimary content
-                // Inactive item has transparent background with onSurfaceVariant content
-                Row(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                        .clickable {
-                            if (currentRoute != screen.route) {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
+                NavBarItem(
+                    screen = screen,
+                    isSelected = isSelected,
+                    onClick = {
+                        if (currentRoute != screen.route) {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
                                 }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = screen.icon,
-                        contentDescription = screen.title,
-                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    if (isSelected) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = screen.title,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium
-                        )
                     }
-                }
+                )
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.width(12.dp))
+@Composable
+private fun NavBarItem(
+    screen: Screen,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
-        // Right floating circle button (Search)
-        val isSearchSelected = currentRoute == Screen.Search.route
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .clickable {
-                    if (currentRoute != Screen.Search.route) {
-                        navController.navigate(Screen.Search.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Screen.Search.icon,
-                contentDescription = Screen.Search.title,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(28.dp)
+    // Bouncy press effect (shrinks to 0.88f and bounces back)
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "NavBarItemScale"
+    )
+
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        Color.Transparent
+    }
+
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = Modifier
+            .height(48.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CircleShape)
+            .background(containerColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null // Disables default ripple so our custom press animation stands out cleanly
+            ) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
             )
+            .then(
+                if (isSelected) {
+                    Modifier.padding(horizontal = 16.dp)
+                } else {
+                    Modifier.width(48.dp)
+                }
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = screen.icon,
+            contentDescription = screen.title,
+            tint = contentColor,
+            modifier = Modifier.size(24.dp)
+        )
+        
+        AnimatedVisibility(
+            visible = isSelected,
+            enter = fadeIn(animationSpec = tween(150, delayMillis = 80)) + 
+                    slideInHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMedium)) { -it / 2 },
+            exit = fadeOut(animationSpec = tween(100))
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = screen.title,
+                    color = contentColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
