@@ -394,6 +394,20 @@ class MusicPlayerManager @Inject constructor(
         }
     }
 
+    fun playSongWithRecommendations(song: Song) {
+        Log.d(TAG, "playSongWithRecommendations: songId='${song.id}', name='${song.name}'")
+        queueManager.setQueue(listOf(song), 0)
+        playSong(song)
+        scope.launch {
+            try {
+                queueManager.loadMoreSuggestions()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load suggestions: ${e.message}", e)
+            }
+        }
+    }
+
+
     suspend fun playNext() {
         Log.d(TAG, "playNext() invoked")
         if (queueManager.isNearEnd()) {

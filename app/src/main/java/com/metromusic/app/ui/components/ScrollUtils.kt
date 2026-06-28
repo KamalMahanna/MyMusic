@@ -27,7 +27,7 @@ fun rememberFrictionFlingBehavior(frictionMultiplier: Float = 0.7f): FlingBehavi
         with(density) { 3500.dp.toPx() }
     }
     val velocityThreshold = remember(density) {
-        with(density) { 150.dp.toPx() }
+        with(density) { 30.dp.toPx() }
     }
     
     val decaySpec = remember(frictionMultiplier) {
@@ -59,12 +59,13 @@ fun rememberFrictionFlingBehavior(frictionMultiplier: Float = 0.7f): FlingBehavi
                     // Cancel the fling animation if we hit the bounds of the list
                     if (abs(delta - consumed) > 0.5f) {
                         cancelAnimation()
-                    }
-                    
-                    // Cancel the fling animation early if velocity is extremely low
-                    // to prevent the long tail from blocking subsequent clicks
-                    if (abs(velocity) < velocityThreshold) {
+                    } else if (abs(clampedVelocity) > velocityThreshold && abs(velocity) < velocityThreshold) {
+                        // Cancel the fling animation early if velocity is extremely low
+                        // to prevent the long tail from blocking subsequent clicks.
+                        // We only cancel if we started above the threshold and have now decayed below it,
+                        // and we return 0f to signal that the scroll has finished.
                         cancelAnimation()
+                        velocityLeft = 0f
                     }
                 }
                 return velocityLeft

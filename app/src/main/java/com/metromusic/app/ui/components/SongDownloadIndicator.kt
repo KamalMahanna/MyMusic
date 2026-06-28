@@ -20,12 +20,13 @@ fun SongDownloadIndicator(
     onDownloadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val downloadState by playerViewModel.downloadState.collectAsState()
-    val isDownloading = downloadState.songId == songId && downloadState.isDownloading
+    val downloadStates by playerViewModel.downloadStates.collectAsState()
+    val state = downloadStates[songId]
+    val isDownloading = state?.isDownloading == true
 
     if (isDownloading) {
         CircularProgressIndicator(
-            progress = { downloadState.progress },
+            progress = { state?.progress ?: 0f },
             modifier = modifier.size(24.dp),
             strokeWidth = 2.5.dp
         )

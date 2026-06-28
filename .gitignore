@@ -27,3 +27,7 @@ captures/
 release.keystore
 *.keystore
 *.jks
+.venv
+# Added by code-review-graph
+.code-review-graph/
+.agent

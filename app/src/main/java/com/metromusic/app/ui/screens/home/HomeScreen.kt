@@ -188,7 +188,7 @@ internal fun PlaylistSheetContent(
 ) {
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
-    val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
     Column(
@@ -267,7 +267,7 @@ internal fun PlaylistSheetContent(
                     key = { _, song -> song.id },
                     contentType = { _, _ -> "song" }
                 ) { index, song ->
-                    val isDownloading = activeDownloadSongId == song.id
+                    val isDownloading = downloadStates[song.id]?.isDownloading == true
                     val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
                     
@@ -307,7 +307,7 @@ internal fun AlbumSheetContent(
 ) {
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
-    val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
     Column(
@@ -386,7 +386,7 @@ internal fun AlbumSheetContent(
                     key = { _, song -> song.id },
                     contentType = { _, _ -> "song" }
                 ) { index, song ->
-                    val isDownloading = activeDownloadSongId == song.id
+                    val isDownloading = downloadStates[song.id]?.isDownloading == true
                     val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
                     

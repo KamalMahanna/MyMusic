@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -42,6 +43,9 @@ class SongDownloader @Inject constructor(
 ) {
     private val _downloadState = MutableStateFlow(DownloadState())
     val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+
+    private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
+    val downloadStates: StateFlow<Map<String, DownloadState>> = _downloadStates.asStateFlow()
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -76,11 +80,13 @@ class SongDownloader @Inject constructor(
             return@withContext true
         }
 
-        _downloadState.value = DownloadState(
+        val startState = DownloadState(
             songId = song.id,
             songName = song.name,
             isDownloading = true
         )
+        _downloadState.value = startState
+        _downloadStates.update { it + (song.id to startState) }
 
         val tempFile = File(context.cacheDir, "temp_download_${song.id}.m4a")
         if (tempFile.exists()) {
@@ -95,20 +101,24 @@ class SongDownloader @Inject constructor(
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "downloadSong: Download request failed with HTTP ${response.code} for URL: $downloadUrl")
-                _downloadState.value = _downloadState.value.copy(
+                val errorState = (_downloadStates.value[song.id] ?: DownloadState(songId = song.id, songName = song.name)).copy(
                     isDownloading = false,
                     error = "Download failed: ${response.code}"
                 )
+                _downloadState.value = errorState
+                _downloadStates.update { it + (song.id to errorState) }
                 return@withContext false
             }
 
             val body = response.body
             if (body == null) {
                 Log.e(TAG, "downloadSong: Response body is null")
-                _downloadState.value = _downloadState.value.copy(
+                val errorState = (_downloadStates.value[song.id] ?: DownloadState(songId = song.id, songName = song.name)).copy(
                     isDownloading = false,
                     error = "Empty response body"
                 )
+                _downloadState.value = errorState
+                _downloadStates.update { it + (song.id to errorState) }
                 return@withContext false
             }
 
@@ -129,7 +139,9 @@ class SongDownloader @Inject constructor(
                             downloadedBytes.toFloat() / totalBytes.toFloat()
                         } else 0f
 
-                        _downloadState.value = _downloadState.value.copy(progress = progress)
+                        val progressState = (_downloadStates.value[song.id] ?: DownloadState(songId = song.id, songName = song.name, isDownloading = true)).copy(progress = progress)
+                        _downloadState.value = progressState
+                        _downloadStates.update { it + (song.id to progressState) }
                         updateNotification(song.name, (progress * 100).toInt())
                     }
                 }
@@ -145,13 +157,15 @@ class SongDownloader @Inject constructor(
             tempFile.delete()
 
             Log.d(TAG, "downloadSong: Complete! Saved to ${file.absolutePath}")
-            _downloadState.value = DownloadState(
+            val completeState = DownloadState(
                 songId = song.id,
                 songName = song.name,
                 progress = 1f,
                 isDownloading = false,
                 isComplete = true
             )
+            _downloadState.value = completeState
+            _downloadStates.update { it + (song.id to completeState) }
 
             showCompleteNotification(song.name)
             downloadRepository.refreshDownloadedSongs()
@@ -160,12 +174,14 @@ class SongDownloader @Inject constructor(
             Log.e(TAG, "downloadSong: Error during download/tagging", e)
             if (tempFile.exists()) tempFile.delete()
             if (file.exists()) file.delete()
-            _downloadState.value = DownloadState(
+            val exceptionState = DownloadState(
                 songId = song.id,
                 songName = song.name,
                 isDownloading = false,
                 error = e.message
             )
+            _downloadState.value = exceptionState
+            _downloadStates.update { it + (song.id to exceptionState) }
             false
         }
     }

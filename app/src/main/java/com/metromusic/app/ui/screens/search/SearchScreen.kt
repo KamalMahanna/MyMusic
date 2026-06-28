@@ -9,13 +9,17 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +43,10 @@ import com.metromusic.app.ui.screens.player.PlayerViewModel
 import com.metromusic.app.ui.screens.home.PlaylistSheetContent
 import com.metromusic.app.ui.screens.home.AlbumSheetContent
 
+enum class SearchCategory {
+    SONGS, ALBUMS, ARTISTS, PLAYLISTS
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
@@ -50,8 +58,33 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val downloadedSongs by playerViewModel.downloadedSongs.collectAsState(initial = emptyList())
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
-    val activeDownloadSongId by playerViewModel.activeDownloadSongId.collectAsState(initial = null)
+    val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
+
+    val gridState = rememberLazyGridState()
+
+    var selectedCategory by remember { mutableStateOf(SearchCategory.SONGS) }
+
+    LaunchedEffect(uiState.query) {
+        if (uiState.query.isBlank()) {
+            selectedCategory = SearchCategory.SONGS
+        }
+    }
+
+    val availableCategories = remember(uiState.songs, uiState.albums, uiState.artists, uiState.playlists) {
+        buildList {
+            if (uiState.songs.isNotEmpty()) add(SearchCategory.SONGS)
+            if (uiState.albums.isNotEmpty()) add(SearchCategory.ALBUMS)
+            if (uiState.artists.isNotEmpty()) add(SearchCategory.ARTISTS)
+            if (uiState.playlists.isNotEmpty()) add(SearchCategory.PLAYLISTS)
+        }
+    }
+
+    LaunchedEffect(availableCategories, uiState.isLoading) {
+        if (!uiState.isLoading && availableCategories.isNotEmpty() && selectedCategory !in availableCategories) {
+            selectedCategory = availableCategories.first()
+        }
+    }
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -69,17 +102,58 @@ fun SearchScreen(
         }
     }
 
+    LaunchedEffect(gridState.isScrollInProgress) {
+        if (gridState.isScrollInProgress) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = uiState.query,
             onValueChange = viewModel::onQueryChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
                 .focusRequester(focusRequester),
             placeholder = { Text("Search...") },
             singleLine = true
         )
+
+        if (uiState.query.isNotBlank() && !uiState.isLoading && uiState.error == null && availableCategories.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 8.dp)
+            ) {
+                availableCategories.forEach { category ->
+                    item {
+                        val isSelected = selectedCategory == category
+                        val label = when (category) {
+                            SearchCategory.SONGS -> "Songs"
+                            SearchCategory.ALBUMS -> "Albums"
+                            SearchCategory.ARTISTS -> "Artists"
+                            SearchCategory.PLAYLISTS -> "Playlists"
+                        }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = category },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = null
+                        )
+                    }
+                }
+            }
+        }
 
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -90,7 +164,6 @@ fun SearchScreen(
                 Text(text = "Error: ${uiState.error}")
             }
         } else {
-            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isTablet) 4 else 2),
                 state = gridState,
@@ -99,7 +172,7 @@ fun SearchScreen(
                 flingBehavior = rememberFrictionFlingBehavior()
             ) {
                 // 1. Songs Section
-                if (uiState.songs.isNotEmpty()) {
+                if (selectedCategory == SearchCategory.SONGS && uiState.songs.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Songs",
@@ -113,13 +186,13 @@ fun SearchScreen(
                         key = { _, song -> song.id },
                         span = { _, _ -> GridItemSpan(2) } // 2 columns on tablet, 1 column on mobile
                     ) { index, song ->
-                        val isDownloading = activeDownloadSongId == song.id
+                        val isDownloading = downloadStates[song.id]?.isDownloading == true
                         val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                         val isPlaying = currentPlayingSongId == song.id
                         
-                        val onClick = remember(uiState.songs, index) {
+                        val onClick = remember(song) {
                             {
-                                playerViewModel.playSongFromList(uiState.songs, index)
+                                playerViewModel.playSongWithRecommendations(song)
                                 onPlaySong()
                             }
                         }
@@ -140,7 +213,7 @@ fun SearchScreen(
                 }
 
                 // 2. Albums Section
-                if (uiState.albums.isNotEmpty()) {
+                if (selectedCategory == SearchCategory.ALBUMS && uiState.albums.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Albums",
@@ -184,7 +257,7 @@ fun SearchScreen(
                 }
 
                 // 3. Artists Section
-                if (uiState.artists.isNotEmpty()) {
+                if (selectedCategory == SearchCategory.ARTISTS && uiState.artists.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Artists",
@@ -229,7 +302,7 @@ fun SearchScreen(
                 }
 
                 // 4. Playlists Section
-                if (uiState.playlists.isNotEmpty()) {
+                if (selectedCategory == SearchCategory.PLAYLISTS && uiState.playlists.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "Playlists",
@@ -267,6 +340,24 @@ fun SearchScreen(
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                // General empty state
+                if (availableCategories.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No results found",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -362,7 +453,7 @@ fun SearchScreen(
                             items = topSongs,
                             key = { _, song -> song.id }
                         ) { index, song ->
-                            val isDownloading = activeDownloadSongId == song.id
+                            val isDownloading = downloadStates[song.id]?.isDownloading == true
                             val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                             val isPlaying = currentPlayingSongId == song.id
                             

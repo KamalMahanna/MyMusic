@@ -26,6 +26,7 @@ class PlayerViewModel @Inject constructor(
 
     val playbackState = musicPlayerManager.playbackState
     val downloadState = songDownloader.downloadState
+    val downloadStates = songDownloader.downloadStates
     val queue = queueManager.queue
     val queueIndex = queueManager.currentIndex
     val downloadedSongs = downloadRepository.downloadedSongs
@@ -79,6 +80,11 @@ class PlayerViewModel @Inject constructor(
     fun playSongFromList(songs: List<Song>, index: Int) {
         musicPlayerManager.playSongFromQueue(songs, index)
     }
+
+    fun playSongWithRecommendations(song: Song) {
+        musicPlayerManager.playSongWithRecommendations(song)
+    }
+
 
     fun playNext() {
         viewModelScope.launch {

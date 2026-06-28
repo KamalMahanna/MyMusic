@@ -55,7 +55,6 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val playbackState by viewModel.playbackState.collectAsState()
-    val downloadState by viewModel.downloadState.collectAsState()
     val song = playbackState.currentSong ?: return
     val currentIndex by viewModel.queueIndex.collectAsState()
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
@@ -707,13 +706,14 @@ private fun PlayerScreenDownloadButton(
     modifier: Modifier = Modifier
 ) {
     val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
-    val downloadState by viewModel.downloadState.collectAsState()
-    val isDownloading = downloadState.songId == song.id && downloadState.isDownloading
+    val downloadStates by viewModel.downloadStates.collectAsState()
+    val state = downloadStates[song.id]
+    val isDownloading = state?.isDownloading == true
     val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
 
     if (isDownloading) {
         CircularProgressIndicator(
-            progress = { downloadState.progress },
+            progress = { state?.progress ?: 0f },
             modifier = modifier.size(28.dp),
             strokeWidth = 3.dp
         )
