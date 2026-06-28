@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.mymusic.app.ui.screens.home
 
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,7 +57,7 @@ fun HomeScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularWavyProgressIndicator()
             }
         } else if (uiState.error != null && uiState.sections.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -238,7 +242,7 @@ internal fun PlaylistSheetContent(
                     .height(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularWavyProgressIndicator()
             }
         } else if (songs.isEmpty()) {
             Box(
@@ -284,6 +288,8 @@ internal fun PlaylistSheetContent(
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,
                         downloadProgress = downloadStates[song.id]?.progress,
+                        index = index,
+                        totalCount = songs.size,
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -357,7 +363,7 @@ internal fun AlbumSheetContent(
                     .height(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularWavyProgressIndicator()
             }
         } else if (songs.isEmpty()) {
             Box(
@@ -403,6 +409,8 @@ internal fun AlbumSheetContent(
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,
                         downloadProgress = downloadStates[song.id]?.progress,
+                        index = index,
+                        totalCount = songs.size,
                         modifier = Modifier.animateItem()
                     )
                 }

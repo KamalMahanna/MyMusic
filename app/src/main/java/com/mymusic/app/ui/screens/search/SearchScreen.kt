@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.mymusic.app.ui.screens.search
 
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -155,7 +159,7 @@ fun SearchScreen(
 
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularWavyProgressIndicator()
             }
         } else if (uiState.error != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -205,6 +209,8 @@ fun SearchScreen(
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
                             downloadProgress = downloadStates[song.id]?.progress,
+                            index = index,
+                            totalCount = uiState.songs.size,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -372,7 +378,7 @@ fun SearchScreen(
                 .clickable(enabled = false) {}, // Block clicks underneath
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            CircularWavyProgressIndicator()
         }
     }
 
@@ -472,7 +478,9 @@ fun SearchScreen(
                                 isDownloaded = isDownloaded,
                                 isDownloading = isDownloading,
                                 isPlaying = isPlaying,
-                                downloadProgress = downloadStates[song.id]?.progress
+                                downloadProgress = downloadStates[song.id]?.progress,
+                                index = index,
+                                totalCount = topSongs.size
                             )
                         }
                     }

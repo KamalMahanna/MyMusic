@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.mymusic.app.ui.screens.player
 
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -23,7 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,10 +43,23 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.shape.CircleShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.ui.components.SongDownloadIndicator
+import com.mymusic.app.ui.components.SongListItem
+import com.mymusic.app.ui.components.groupedSongItemShape
+import com.mymusic.app.ui.components.WaveSlider
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -176,7 +193,7 @@ fun PlayerScreen(
                 }
             ) {
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = "Back",
                     modifier = Modifier.size(32.dp)
                 )
@@ -198,7 +215,7 @@ fun PlayerScreen(
                     }
                 ) {
                     Icon(
-                        imageVector = if (showQueue) Icons.Default.Shuffle else Icons.Default.QueueMusic,
+                        imageVector = if (showQueue) Icons.Rounded.Shuffle else Icons.Rounded.QueueMusic,
                         contentDescription = if (showQueue) "Toggle Shuffle" else "Toggle Queue",
                         modifier = Modifier.size(28.dp),
                         tint = if (showQueue && isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
@@ -266,7 +283,7 @@ fun PlayerScreen(
                         )
                         IconButton(onClick = { viewModel.toggleShuffle() }) {
                             Icon(
-                                imageVector = Icons.Default.Shuffle,
+                                imageVector = Icons.Rounded.Shuffle,
                                 contentDescription = "Toggle Shuffle",
                                 modifier = Modifier.size(24.dp),
                                 tint = if (isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
@@ -410,7 +427,7 @@ fun PlayerScreen(
 
                                 var sliderPosition by remember { mutableStateOf<Float?>(null) }
 
-                                Slider(
+                                WaveSlider(
                                     value = sliderPosition ?: progress,
                                     onValueChange = { sliderPosition = it },
                                     onValueChangeFinished = {
@@ -419,6 +436,7 @@ fun PlayerScreen(
                                         }
                                         sliderPosition = null
                                     },
+                                    isPlaying = playbackState.isPlaying,
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
@@ -445,49 +463,13 @@ fun PlayerScreen(
                         Spacer(modifier = Modifier.weight(0.1f))
 
                         // Controls Row (Static)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = { viewModel.playPrevious() }) {
-                                Icon(
-                                    imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Previous",
-                                    modifier = Modifier.size(48.dp)
-                                )
-                            }
-
-                            FloatingActionButton(
-                                onClick = { viewModel.togglePlayPause() },
-                                shape = RoundedCornerShape(100.dp),
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(72.dp)
-                            ) {
-                                if (playbackState.isBuffering) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(36.dp),
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        strokeWidth = 3.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = "Play/Pause",
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                }
-                            }
-
-                            IconButton(onClick = { viewModel.playNext() }) {
-                                Icon(
-                                    imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Next",
-                                    modifier = Modifier.size(48.dp)
-                                )
-                            }
-                        }
+                        PlaybackControls(
+                            isPlaying = playbackState.isPlaying,
+                            isBuffering = playbackState.isBuffering,
+                            onPreviousClick = { viewModel.playPrevious() },
+                            onPlayPauseClick = { viewModel.togglePlayPause() },
+                            onNextClick = { viewModel.playNext() }
+                        )
 
                         Spacer(modifier = Modifier.weight(0.1f))
                     }
@@ -593,7 +575,7 @@ fun QueueView(
         } else {
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 80.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 itemsIndexed(
@@ -609,6 +591,10 @@ fun QueueView(
                         }
                     )
 
+                    val itemShape = remember(index, queue.size) {
+                        groupedSongItemShape(index, queue.size)
+                    }
+
                     SwipeToDismissBox(
                         state = dismissState,
                         enableDismissFromStartToEnd = true,
@@ -621,74 +607,48 @@ fun QueueView(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    .clip(itemShape)
                                     .background(color)
                                     .padding(horizontal = 20.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Delete,
+                                    imageVector = Icons.Rounded.Delete,
                                     contentDescription = "Delete",
                                     tint = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (index == currentIndex) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .clickable { viewModel.playQueueIndex(index) }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AsyncImage(
-                                model = song.mediumQualityImageUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = song.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = song.primaryArtistNames,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                        SongListItem(
+                            song = song,
+                            onClick = { viewModel.playQueueIndex(index) },
+                            onDownloadClick = {},
+                            isDownloaded = false,
+                            isDownloading = false,
+                            isPlaying = index == currentIndex,
+                            index = index,
+                            totalCount = queue.size,
+                            trailingContent = {
+                                if (index == currentIndex) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                                        contentDescription = "Playing",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                } else {
+                                    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
+                                    SongDownloadIndicator(
+                                        songId = song.id,
+                                        playerViewModel = viewModel,
+                                        isDownloaded = isDownloaded,
+                                        onDownloadClick = { viewModel.downloadSong(song) }
+                                    )
+                                }
                             }
-                            
-                            if (index == currentIndex) {
-                                Icon(
-                                    imageVector = Icons.Default.VolumeUp,
-                                    contentDescription = "Playing",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            } else {
-                                val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
-                                SongDownloadIndicator(
-                                    songId = song.id,
-                                    playerViewModel = viewModel,
-                                    isDownloaded = isDownloaded,
-                                    onDownloadClick = { viewModel.downloadSong(song) }
-                                )
-                            }
-                        }
+                        )
                     }
                 }
             }
@@ -713,10 +673,9 @@ private fun PlayerScreenDownloadButton(
             modifier = modifier.size(48.dp),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 progress = { state?.progress ?: 0f },
-                modifier = Modifier.size(28.dp),
-                strokeWidth = 3.dp
+                modifier = Modifier.size(28.dp)
             )
         }
     } else {
@@ -725,7 +684,7 @@ private fun PlayerScreenDownloadButton(
             modifier = modifier
         ) {
             Icon(
-                imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                 contentDescription = "Download High Quality 320kbps",
                 modifier = Modifier.size(28.dp),
                 tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
@@ -808,7 +767,7 @@ private fun TabletNowPlayingContent(
 
         var sliderPosition by remember { mutableStateOf<Float?>(null) }
 
-        Slider(
+        WaveSlider(
             value = sliderPosition ?: progress,
             onValueChange = { sliderPosition = it },
             onValueChangeFinished = {
@@ -817,6 +776,7 @@ private fun TabletNowPlayingContent(
                 }
                 sliderPosition = null
             },
+            isPlaying = playbackState.isPlaying,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -839,51 +799,146 @@ private fun TabletNowPlayingContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+        PlaybackControls(
+            isPlaying = playbackState.isPlaying,
+            isBuffering = playbackState.isBuffering,
+            onPreviousClick = { viewModel.playPrevious() },
+            onPlayPauseClick = { viewModel.togglePlayPause() },
+            onNextClick = { viewModel.playNext() }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun PlaybackControls(
+    isPlaying: Boolean,
+    isBuffering: Boolean,
+    onPreviousClick: () -> Unit,
+    onPlayPauseClick: () -> Unit,
+    onNextClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalHapticFeedback.current
+
+    val prevInteractionSource = remember { MutableInteractionSource() }
+    val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
+    val prevScale by animateFloatAsState(
+        targetValue = if (isPrevPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "PrevScale"
+    )
+
+    val playInteractionSource = remember { MutableInteractionSource() }
+    val isPlayPressed by playInteractionSource.collectIsPressedAsState()
+    val playScale by animateFloatAsState(
+        targetValue = if (isPlayPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "PlayScale"
+    )
+
+    val nextInteractionSource = remember { MutableInteractionSource() }
+    val isNextPressed by nextInteractionSource.collectIsPressedAsState()
+    val nextScale by animateFloatAsState(
+        targetValue = if (isNextPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "NextScale"
+    )
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FilledTonalIconButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onPreviousClick()
+            },
+            modifier = Modifier
+                .size(width = 56.dp, height = 44.dp)
+                .graphicsLayer {
+                    scaleX = prevScale
+                    scaleY = prevScale
+                },
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            interactionSource = prevInteractionSource
         ) {
-            IconButton(onClick = { viewModel.playPrevious() }) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Previous",
-                    modifier = Modifier.size(48.dp)
-                )
-            }
+            Icon(
+                imageVector = Icons.Rounded.SkipPrevious,
+                contentDescription = "Previous",
+                modifier = Modifier.size(24.dp)
+            )
+        }
 
-            FloatingActionButton(
-                onClick = { viewModel.togglePlayPause() },
-                shape = RoundedCornerShape(100.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(72.dp)
-            ) {
-                if (playbackState.isBuffering) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(36.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        strokeWidth = 3.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        modifier = Modifier.size(40.dp)
-                    )
+        FloatingActionButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onPlayPauseClick()
+            },
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            interactionSource = playInteractionSource,
+            modifier = Modifier
+                .size(72.dp)
+                .graphicsLayer {
+                    scaleX = playScale
+                    scaleY = playScale
                 }
-            }
-
-            IconButton(onClick = { viewModel.playNext() }) {
+        ) {
+            if (isBuffering) {
+                CircularWavyProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            } else {
                 Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next",
-                    modifier = Modifier.size(48.dp)
+                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = "Play/Pause",
+                    modifier = Modifier.size(40.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        FilledTonalIconButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onNextClick()
+            },
+            modifier = Modifier
+                .size(width = 56.dp, height = 44.dp)
+                .graphicsLayer {
+                    scaleX = nextScale
+                    scaleY = nextScale
+                },
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            interactionSource = nextInteractionSource
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.SkipNext,
+                contentDescription = "Next",
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 

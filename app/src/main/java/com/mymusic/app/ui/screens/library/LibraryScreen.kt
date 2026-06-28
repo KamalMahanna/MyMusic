@@ -1,28 +1,21 @@
 package com.mymusic.app.ui.screens.library
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil3.compose.AsyncImage
 import com.mymusic.app.ui.screens.player.PlayerViewModel
+import com.mymusic.app.ui.components.SongListItem
 
 @Composable
 fun LibraryScreen(
@@ -33,6 +26,7 @@ fun LibraryScreen(
     val songs by viewModel.downloadedSongs.collectAsState()
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
+    val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
 
     if (songs.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -41,7 +35,9 @@ fun LibraryScreen(
         return
     }
 
+    val songList = remember(songs) { viewModel.getAsSongList() }
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isTablet) 2 else 1),
         state = gridState,
@@ -55,55 +51,35 @@ fun LibraryScreen(
                 modifier = Modifier.padding(16.dp)
             )
         }
-        items(
-            items = songs,
-            key = { song -> song.id }
-        ) { song ->
-            Row(
-                modifier = Modifier
-                    .animateItem()
-                    .fillMaxWidth()
-                    .clickable {
-                        val songList = viewModel.getAsSongList()
-                        val index = songList.indexOfFirst { it.id == song.id }
-                        if (index != -1) {
-                            playerViewModel.playSongFromList(songList, index)
-                            onPlaySong()
-                        }
+        itemsIndexed(
+            items = songList,
+            key = { _, song -> song.id }
+        ) { index, song ->
+            val isPlaying = currentPlayingSongId == song.id
+            SongListItem(
+                song = song,
+                onClick = {
+                    playerViewModel.playSongFromList(songList, index)
+                    onPlaySong()
+                },
+                onDownloadClick = {},
+                isDownloaded = true,
+                isDownloading = false,
+                isPlaying = isPlaying,
+                index = index,
+                totalCount = songList.size,
+                trailingContent = {
+                    IconButton(onClick = { viewModel.deleteSong(songs[index]) }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!song.imageUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = song.imageUrl,
-                        contentDescription = "Song Artwork",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(50.dp).padding(8.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = song.name, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "${song.artist} • ${song.fileSizeFormatted}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = { viewModel.deleteSong(song) }) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete")
-                }
-            }
+                },
+                modifier = Modifier.animateItem()
+            )
         }
     }
 }
+

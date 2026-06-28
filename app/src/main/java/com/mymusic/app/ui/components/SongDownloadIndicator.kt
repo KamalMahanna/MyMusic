@@ -1,10 +1,12 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.mymusic.app.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,10 +33,9 @@ fun SongDownloadIndicator(
             modifier = modifier.size(48.dp),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
+            CircularWavyProgressIndicator(
                 progress = { state?.progress ?: 0f },
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.5.dp
+                modifier = Modifier.size(24.dp)
             )
         }
     } else {
@@ -43,7 +44,7 @@ fun SongDownloadIndicator(
             modifier = modifier
         ) {
             Icon(
-                imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                 contentDescription = "Download",
                 tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )

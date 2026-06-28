@@ -1,28 +1,37 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.mymusic.app.ui.components
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.mymusic.app.ui.screens.player.PlayerViewModel
+import kotlin.math.abs
 
 @Composable
 fun MiniPlayer(
@@ -35,16 +44,53 @@ fun MiniPlayer(
     val isBuffering by viewModel.isBuffering.collectAsState()
 
     val currentSong = song ?: return
+    val haptics = LocalHapticFeedback.current
+
+    var totalDragX by remember { mutableStateOf(0f) }
+    var totalDragY by remember { mutableStateOf(0f) }
+    val swipeThreshold = 80f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onPlayerClick() }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        totalDragX = 0f
+                        totalDragY = 0f
+                    },
+                    onDragEnd = {
+                        val absX = abs(totalDragX)
+                        val absY = abs(totalDragY)
+                        if (absX > absY) {
+                            if (totalDragX < -swipeThreshold) {
+                                // Swiping left -> plays previous song
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.playPrevious()
+                            } else if (totalDragX > swipeThreshold) {
+                                // Swiping right -> plays next song
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.playNext()
+                            }
+                        } else if (totalDragY < -swipeThreshold) {
+                            // Swiping up -> open full player
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPlayerClick()
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        totalDragX += dragAmount.x
+                        totalDragY += dragAmount.y
+                    }
+                )
+            }
     ) {
-        // Progress overlay — isolated composable so only IT recomposes every 500ms.
+        // Progress background overlay
         MiniPlayerProgress(
             viewModel = viewModel,
             modifier = Modifier.matchParentSize()
@@ -54,77 +100,111 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+                .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            AsyncImage(
-                model = currentSong.mediumQualityImageUrl,
-                contentDescription = "Artwork",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            Column(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = currentSong.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                AsyncImage(
+                    model = currentSong.mediumQualityImageUrl,
+                    contentDescription = "Artwork",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
                 )
-                Text(
-                    text = currentSong.primaryArtistNames,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        text = currentSong.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = currentSong.primaryArtistNames,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.width(12.dp))
             
+            CircularPlayPauseButton(
+                isPlaying = isPlaying,
+                isBuffering = isBuffering,
+                onPlayPauseClick = { viewModel.togglePlayPause() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CircularPlayPauseButton(
+    isPlaying: Boolean,
+    isBuffering: Boolean,
+    onPlayPauseClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val playScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "PlayPauseScale"
+    )
+
+    val haptics = LocalHapticFeedback.current
+
+    Box(
+        modifier = modifier.size(48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        FilledIconButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onPlayPauseClick()
+            },
+            modifier = Modifier
+                .size(48.dp)
+                .graphicsLayer {
+                    scaleX = playScale
+                    scaleY = playScale
+                },
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            interactionSource = interactionSource
+        ) {
             if (isBuffering) {
-                Box(
-                    modifier = Modifier.size(48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
             } else {
-                IconButton(
-                    onClick = { viewModel.togglePlayPause() }
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause"
-                    )
-                }
-            }
-            
-            IconButton(
-                onClick = { viewModel.playNext() }
-            ) {
                 Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next"
+                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = "Play/Pause",
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
     }
 }
 
-/**
- * Isolated composable for the MiniPlayer progress background overlay.
- * Only this function collects playbackState and recomposes on every 500ms playback tick,
- * preventing the entire MiniPlayer (artwork, title, buttons) from recomposing.
- */
 @Composable
 private fun MiniPlayerProgress(
     viewModel: PlayerViewModel,
@@ -150,3 +230,4 @@ private fun MiniPlayerProgress(
         )
     }
 }
+
