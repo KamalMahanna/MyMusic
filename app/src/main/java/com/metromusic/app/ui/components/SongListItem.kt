@@ -33,7 +33,8 @@ fun SongListItem(
     isDownloaded: Boolean,
     isDownloading: Boolean,
     modifier: Modifier = Modifier,
-    isPlaying: Boolean = false
+    isPlaying: Boolean = false,
+    downloadProgress: Float? = null
 ) {
     val animatedBgColor by animateColorAsState(
         targetValue = if (isPlaying)
@@ -93,7 +94,16 @@ fun SongListItem(
                 modifier = Modifier.padding(12.dp)
             )
         } else if (isDownloading) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    progress = { downloadProgress ?: 0f },
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.5.dp
+                )
+            }
         } else {
             IconButton(onClick = onDownloadClick) {
                 Icon(

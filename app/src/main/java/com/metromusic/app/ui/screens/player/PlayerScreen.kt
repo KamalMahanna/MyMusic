@@ -709,11 +709,16 @@ private fun PlayerScreenDownloadButton(
     val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
 
     if (isDownloading) {
-        CircularProgressIndicator(
-            progress = { state?.progress ?: 0f },
-            modifier = modifier.size(28.dp),
-            strokeWidth = 3.dp
-        )
+        Box(
+            modifier = modifier.size(48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                progress = { state?.progress ?: 0f },
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 3.dp
+            )
+        }
     } else {
         IconButton(
             onClick = { viewModel.downloadSong(song) },

@@ -204,6 +204,7 @@ fun SearchScreen(
                             isDownloaded = isDownloaded,
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
+                            downloadProgress = downloadStates[song.id]?.progress,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -470,7 +471,8 @@ fun SearchScreen(
                                 onDownloadClick = onDownloadClick,
                                 isDownloaded = isDownloaded,
                                 isDownloading = isDownloading,
-                                isPlaying = isPlaying
+                                isPlaying = isPlaying,
+                                downloadProgress = downloadStates[song.id]?.progress
                             )
                         }
                     }

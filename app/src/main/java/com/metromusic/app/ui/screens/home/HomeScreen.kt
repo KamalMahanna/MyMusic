@@ -283,6 +283,7 @@ internal fun PlaylistSheetContent(
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,
+                        downloadProgress = downloadStates[song.id]?.progress,
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -401,6 +402,7 @@ internal fun AlbumSheetContent(
                         isDownloaded = isDownloaded,
                         isDownloading = isDownloading,
                         isPlaying = isPlaying,
+                        downloadProgress = downloadStates[song.id]?.progress,
                         modifier = Modifier.animateItem()
                     )
                 }
