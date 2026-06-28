@@ -31,3 +31,8 @@ release.keystore
 # Added by code-review-graph
 .code-review-graph/
 .agent
+
+# Temporary decompiled scratch files
+temp_decoded.kt
+temp_slider_decoded.kt
+temp_squiggly_decoded.kt
