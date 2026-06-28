@@ -204,23 +204,6 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun getTrending(): Result<List<ModuleItem>> = withContext(Dispatchers.IO) {
-        Log.d(TAG, "getTrending()")
-        try {
-            val response = runWithRetry { api.getTrending() }
-            if (response.success && response.data != null) {
-                Log.d(TAG, "getTrending success: loaded ${response.data.size} items")
-                Result.success(response.data.map { it.clean() })
-            } else {
-                Log.e(TAG, "getTrending failed: success=${response.success}, data is null: ${response.data == null}")
-                Result.failure(Exception("Failed to load trending"))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "getTrending error: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
     companion object {
         private const val TAG = "MusicRepository"
     }

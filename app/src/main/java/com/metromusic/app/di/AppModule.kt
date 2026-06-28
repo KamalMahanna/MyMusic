@@ -60,7 +60,7 @@ object AppModule {
                 
                 val (duration, unit) = when {
                     callParam.contains("search") -> 5 to TimeUnit.MINUTES
-                    callParam.contains("getBrowseModules") || callParam.contains("getTrending") -> 1 to TimeUnit.HOURS
+                    callParam.contains("getBrowseModules") -> 1 to TimeUnit.HOURS
                     else -> 12 to TimeUnit.HOURS
                 }
                 

@@ -1,7 +1,5 @@
 package com.metromusic.app.ui.screens.search
 
-import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -168,8 +166,7 @@ fun SearchScreen(
                 columns = GridCells.Fixed(if (isTablet) 4 else 2),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp),
-                flingBehavior = rememberFrictionFlingBehavior()
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 // 1. Songs Section
                 if (selectedCategory == SearchCategory.SONGS && uiState.songs.isNotEmpty()) {
@@ -446,8 +443,7 @@ fun SearchScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(if (isTablet) 2 else 1),
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = 24.dp),
-                        flingBehavior = rememberFrictionFlingBehavior()
+                        contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         itemsIndexed(
                             items = topSongs,

@@ -1,7 +1,5 @@
 package com.metromusic.app.ui.screens.home
 
-import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -66,8 +64,7 @@ fun HomeScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp), // padding for MiniPlayer
-                flingBehavior = rememberFrictionFlingBehavior()
+                contentPadding = PaddingValues(bottom = 80.dp) // padding for MiniPlayer
             ) {
                 items(
                     items = uiState.sections,
@@ -87,8 +84,7 @@ fun HomeScreen(
                         
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            flingBehavior = rememberFrictionFlingBehavior()
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(
                                 items = section.data,
@@ -259,8 +255,7 @@ internal fun PlaylistSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                flingBehavior = rememberFrictionFlingBehavior()
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 itemsIndexed(
                     items = songs,
@@ -378,8 +373,7 @@ internal fun AlbumSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                flingBehavior = rememberFrictionFlingBehavior()
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 itemsIndexed(
                     items = songs,

@@ -63,7 +63,4 @@ interface SaavnApi {
 
     @GET("api/modules")
     suspend fun getModules(): ApiResponse<List<ModuleSection>>
-
-    @GET("api/trending")
-    suspend fun getTrending(): ApiResponse<List<ModuleItem>>
 }

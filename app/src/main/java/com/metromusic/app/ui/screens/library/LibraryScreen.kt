@@ -1,7 +1,5 @@
 package com.metromusic.app.ui.screens.library
 
-import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -48,8 +46,7 @@ fun LibraryScreen(
         columns = GridCells.Fixed(if (isTablet) 2 else 1),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp),
-        flingBehavior = rememberFrictionFlingBehavior()
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text(

@@ -768,18 +768,4 @@ class SaavnApiImpl @Inject constructor(
             ApiResponse(false, null)
         }
     }
-
-    override suspend fun getTrending(): ApiResponse<List<ModuleItem>> {
-        return try {
-            val json = useFetch(
-                endpoint = "content.getTrending",
-                params = mapOf("entity_type" to "song", "entity_language" to "")
-            )
-            val list = parseJsonToList(json) ?: return ApiResponse(false, null)
-            val items = list.filterIsInstance<Map<String, Any?>>().mapNotNull { parseModuleItem(it) }
-            ApiResponse(true, items)
-        } catch (e: Exception) {
-            ApiResponse(false, null)
-        }
-    }
 }

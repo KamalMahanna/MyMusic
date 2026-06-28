@@ -42,9 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.metromusic.app.data.model.Song
-import com.metromusic.app.player.QueueManager
 import com.metromusic.app.ui.components.SongDownloadIndicator
-import com.metromusic.app.ui.components.rememberFrictionFlingBehavior
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -596,8 +594,7 @@ fun QueueView(
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f),
-                flingBehavior = rememberFrictionFlingBehavior()
+                modifier = Modifier.weight(1f)
             ) {
                 itemsIndexed(
                     items = queue,
