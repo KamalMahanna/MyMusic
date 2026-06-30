@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -54,6 +55,7 @@ enum class SearchCategory {
 fun SearchScreen(
     isPlayerExpanded: Boolean,
     onPlaySong: () -> Unit,
+    bottomPadding: Dp,
     viewModel: SearchViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -170,7 +172,7 @@ fun SearchScreen(
                 columns = GridCells.Fixed(if (isTablet) 4 else 2),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
                 // 1. Songs Section
                 if (selectedCategory == SearchCategory.SONGS && uiState.songs.isNotEmpty()) {

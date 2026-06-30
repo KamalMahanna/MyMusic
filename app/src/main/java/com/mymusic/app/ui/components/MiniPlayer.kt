@@ -52,8 +52,8 @@ fun MiniPlayer(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+            .width(240.dp)
+            .padding(vertical = 8.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onPlayerClick() }

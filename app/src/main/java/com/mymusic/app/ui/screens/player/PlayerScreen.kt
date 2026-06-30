@@ -60,6 +60,7 @@ import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.components.groupedSongItemShape
 import com.mymusic.app.ui.components.WaveSlider
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -215,7 +216,7 @@ fun PlayerScreen(
                     }
                 ) {
                     Icon(
-                        imageVector = if (showQueue) Icons.Rounded.Shuffle else Icons.Rounded.QueueMusic,
+                        imageVector = if (showQueue) Icons.Rounded.Shuffle else Icons.AutoMirrored.Rounded.QueueMusic,
                         contentDescription = if (showQueue) "Toggle Shuffle" else "Toggle Queue",
                         modifier = Modifier.size(28.dp),
                         tint = if (showQueue && isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
@@ -460,7 +461,7 @@ fun PlayerScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.weight(0.1f))
+                        Spacer(modifier = Modifier.weight(0.05f))
 
                         // Controls Row (Static)
                         PlaybackControls(
@@ -469,6 +470,16 @@ fun PlayerScreen(
                             onPreviousClick = { viewModel.playPrevious() },
                             onPlayPauseClick = { viewModel.togglePlayPause() },
                             onNextClick = { viewModel.playNext() }
+                        )
+
+                        Spacer(modifier = Modifier.weight(0.05f))
+
+                        BottomControlsRow(
+                            song = song,
+                            viewModel = viewModel,
+                            isShuffleEnabled = isShuffleEnabled,
+                            onShuffleClick = { viewModel.toggleShuffle() },
+                            onQueueClick = { showQueue = true }
                         )
 
                         Spacer(modifier = Modifier.weight(0.1f))
@@ -937,6 +948,154 @@ private fun PlaybackControls(
                 imageVector = Icons.Rounded.SkipNext,
                 contentDescription = "Next",
                 modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomControlsRow(
+    song: Song,
+    viewModel: PlayerViewModel,
+    isShuffleEnabled: Boolean,
+    onShuffleClick: () -> Unit,
+    onQueueClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
+    val downloadStates by viewModel.downloadStates.collectAsState()
+    val state = downloadStates[song.id]
+    val isDownloading = state?.isDownloading == true
+    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
+
+    val downloadInteractionSource = remember { MutableInteractionSource() }
+    val isDownloadPressed by downloadInteractionSource.collectIsPressedAsState()
+    val downloadScale by animateFloatAsState(
+        targetValue = if (isDownloadPressed) 0.90f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "DownloadScale"
+    )
+
+    val shuffleInteractionSource = remember { MutableInteractionSource() }
+    val isShufflePressed by shuffleInteractionSource.collectIsPressedAsState()
+    val shuffleScale by animateFloatAsState(
+        targetValue = if (isShufflePressed) 0.90f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "ShuffleScale"
+    )
+
+    val queueInteractionSource = remember { MutableInteractionSource() }
+    val isQueuePressed by queueInteractionSource.collectIsPressedAsState()
+    val queueScale by animateFloatAsState(
+        targetValue = if (isQueuePressed) 0.90f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "QueueScale"
+    )
+
+    Row(
+        modifier = modifier
+            .wrapContentSize(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left Button: Download
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = downloadScale
+                    scaleY = downloadScale
+                }
+                .height(48.dp)
+                .width(76.dp)
+                .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 6.dp, bottomEnd = 6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .clickable(
+                    interactionSource = downloadInteractionSource,
+                    indication = null
+                ) {
+                    viewModel.downloadSong(song)
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (isDownloading) {
+                CircularWavyProgressIndicator(
+                    progress = { state?.progress ?: 0f },
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                    contentDescription = "Download",
+                    modifier = Modifier.size(22.dp),
+                    tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Middle Button: Shuffle
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = shuffleScale
+                    scaleY = shuffleScale
+                }
+                .height(48.dp)
+                .width(76.dp)
+                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 6.dp, bottomEnd = 6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .clickable(
+                    interactionSource = shuffleInteractionSource,
+                    indication = null
+                ) {
+                    onShuffleClick()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Shuffle,
+                contentDescription = "Shuffle",
+                modifier = Modifier.size(22.dp),
+                tint = if (isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Right Button: Play Queue
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = queueScale
+                    scaleY = queueScale
+                }
+                .height(48.dp)
+                .width(76.dp)
+                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 24.dp, bottomEnd = 24.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .clickable(
+                    interactionSource = queueInteractionSource,
+                    indication = null
+                ) {
+                    onQueueClick()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                contentDescription = "Play Queue",
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onBackground
             )
         }
     }

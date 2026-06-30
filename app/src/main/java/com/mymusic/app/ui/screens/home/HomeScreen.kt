@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -42,6 +43,7 @@ import com.mymusic.app.ui.screens.player.PlayerViewModel
 @Composable
 fun HomeScreen(
     onPlaySong: () -> Unit,
+    bottomPadding: Dp,
     viewModel: HomeViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -68,7 +70,7 @@ fun HomeScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp) // padding for MiniPlayer
+                contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
                 items(
                     items = uiState.sections,

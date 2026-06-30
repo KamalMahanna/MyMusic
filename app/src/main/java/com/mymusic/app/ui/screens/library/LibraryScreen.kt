@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mymusic.app.ui.screens.player.PlayerViewModel
@@ -20,6 +21,7 @@ import com.mymusic.app.ui.components.SongListItem
 @Composable
 fun LibraryScreen(
     onPlaySong: () -> Unit,
+    bottomPadding: Dp,
     viewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -42,7 +44,7 @@ fun LibraryScreen(
         columns = GridCells.Fixed(if (isTablet) 2 else 1),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 80.dp)
+        contentPadding = PaddingValues(bottom = bottomPadding)
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text(

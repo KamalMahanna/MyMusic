@@ -56,6 +56,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.collectAsState
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.mymusic.app.ui.screens.player.PlayerViewModel
 import com.mymusic.app.ui.components.MiniPlayer
 import com.mymusic.app.ui.screens.home.HomeScreen
 import com.mymusic.app.ui.screens.library.LibraryScreen
@@ -84,9 +91,14 @@ val items = listOf(
 )
 
 @Composable
-fun MyMusicNavGraph() {
+fun MyMusicNavGraph(
+    playerViewModel: PlayerViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
+
+    val currentSong by playerViewModel.currentSong.collectAsState()
+    val isMiniPlayerVisible = currentSong != null && !isPlayerExpanded
 
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
@@ -129,7 +141,29 @@ fun MyMusicNavGraph() {
                     }
                 }
             ) { innerPadding ->
-                Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                val layoutDirection = LocalLayoutDirection.current
+                val bottomBarPadding = innerPadding.calculateBottomPadding()
+                
+                // Exclude bottom padding from content Box so screens draw behind bottom bar
+                val contentPadding = PaddingValues(
+                    start = innerPadding.calculateStartPadding(layoutDirection),
+                    top = innerPadding.calculateTopPadding(),
+                    end = innerPadding.calculateEndPadding(layoutDirection),
+                    bottom = 0.dp
+                )
+
+                // Calculate total bottom padding needed for screen lists to scroll past navbar + MiniPlayer
+                val screenBottomPadding = bottomBarPadding + if (isMiniPlayerVisible) {
+                    if (isTablet) 96.dp else 76.dp
+                } else {
+                    0.dp
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding)
+                ) {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Home.route,
@@ -152,16 +186,23 @@ fun MyMusicNavGraph() {
                         }
                     ) {
                         composable(Screen.Home.route) {
-                            HomeScreen(onPlaySong = { isPlayerExpanded = true })
+                            HomeScreen(
+                                onPlaySong = { isPlayerExpanded = true },
+                                bottomPadding = screenBottomPadding
+                            )
                         }
                         composable(Screen.Search.route) {
                             SearchScreen(
                                 isPlayerExpanded = isPlayerExpanded,
-                                onPlaySong = { isPlayerExpanded = true }
+                                onPlaySong = { isPlayerExpanded = true },
+                                bottomPadding = screenBottomPadding
                             )
                         }
                         composable(Screen.Library.route) {
-                            LibraryScreen(onPlaySong = { isPlayerExpanded = true })
+                            LibraryScreen(
+                                onPlaySong = { isPlayerExpanded = true },
+                                bottomPadding = screenBottomPadding
+                            )
                         }
                     }
                     
@@ -176,12 +217,12 @@ fun MyMusicNavGraph() {
                                slideOutVertically(
                                    targetOffsetY = { it / 2 },
                                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                               ),
+                                ),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .then(
                                 if (isTablet) Modifier.padding(bottom = 16.dp).widthIn(max = 800.dp)
-                                else Modifier.padding(bottom = 8.dp)
+                                else Modifier.padding(bottom = bottomBarPadding - 4.dp)
                             )
                     ) {
                         MiniPlayer(
