@@ -1,5 +1,6 @@
 package com.mymusic.app
 
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,13 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val isTablet = resources.configuration.smallestScreenWidthDp >= 600
+        requestedOrientation = if (isTablet) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {

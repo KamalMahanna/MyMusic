@@ -68,13 +68,13 @@ fun MiniPlayer(
                         val absY = abs(totalDragY)
                         if (absX > absY) {
                             if (totalDragX < -swipeThreshold) {
-                                // Swiping left -> plays previous song
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.playPrevious()
-                            } else if (totalDragX > swipeThreshold) {
-                                // Swiping right -> plays next song
+                                // Swiping left -> plays next song
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 viewModel.playNext()
+                            } else if (totalDragX > swipeThreshold) {
+                                // Swiping right -> plays previous song
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.playPrevious()
                             }
                         } else if (totalDragY < -swipeThreshold) {
                             // Swiping up -> open full player

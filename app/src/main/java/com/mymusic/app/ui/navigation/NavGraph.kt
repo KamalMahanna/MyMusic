@@ -104,110 +104,113 @@ fun MyMusicNavGraph(
     val isTablet = configuration.screenWidthDp >= 600
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            if (isTablet) {
-                NavigationRail(
-                    modifier = Modifier.fillMaxHeight(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                ) {
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentDestination = navBackStackEntry?.destination
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    items.forEach { screen ->
-                        NavigationRailItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+        Scaffold(
+            bottomBar = {
+                if (isTablet) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CustomBottomNavigationContent(navController = navController)
+                        
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = isMiniPlayerVisible,
+                            enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
+                                    slideInHorizontally(
+                                        initialOffsetX = { it / 2 },
+                                        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                                    ),
+                            exit = fadeOut(animationSpec = tween(durationMillis = 150)) + 
+                                   slideOutHorizontally(
+                                       targetOffsetX = { it / 2 },
+                                       animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                                   )
+                        ) {
+                            Row {
+                                Spacer(modifier = Modifier.width(16.dp))
+                                MiniPlayer(
+                                    onPlayerClick = { isPlayerExpanded = true }
+                                )
                             }
+                        }
+                    }
+                } else {
+                    CustomBottomNavigation(navController = navController)
+                }
+            }
+        ) { innerPadding ->
+            val layoutDirection = LocalLayoutDirection.current
+            val bottomBarPadding = innerPadding.calculateBottomPadding()
+            
+            // Exclude bottom padding from content Box so screens draw behind bottom bar
+            val contentPadding = PaddingValues(
+                start = innerPadding.calculateStartPadding(layoutDirection),
+                top = innerPadding.calculateTopPadding(),
+                end = innerPadding.calculateEndPadding(layoutDirection),
+                bottom = 0.dp
+            )
+
+            // Calculate total bottom padding needed for screen lists to scroll past navbar + MiniPlayer
+            val screenBottomPadding = if (isTablet) {
+                bottomBarPadding
+            } else {
+                bottomBarPadding + if (isMiniPlayerVisible) 76.dp else 0.dp
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+            ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Home.route,
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = {
+                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 12 }
+                    },
+                    exitTransition = {
+                        fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it / 12 }
+                    },
+                    popEnterTransition = {
+                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { -it / 12 }
+                    },
+                    popExitTransition = {
+                        fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it / 12 }
+                    }
+                ) {
+                    composable(Screen.Home.route) {
+                        HomeScreen(
+                            onPlaySong = { isPlayerExpanded = true },
+                            bottomPadding = screenBottomPadding
+                        )
+                    }
+                    composable(Screen.Search.route) {
+                        SearchScreen(
+                            isPlayerExpanded = isPlayerExpanded,
+                            onPlaySong = { isPlayerExpanded = true },
+                            bottomPadding = screenBottomPadding
+                        )
+                    }
+                    composable(Screen.Library.route) {
+                        LibraryScreen(
+                            onPlaySong = { isPlayerExpanded = true },
+                            bottomPadding = screenBottomPadding
                         )
                     }
                 }
-            }
-
-            Scaffold(
-                bottomBar = {
-                    if (!isTablet) {
-                        CustomBottomNavigation(navController = navController)
-                    }
-                }
-            ) { innerPadding ->
-                val layoutDirection = LocalLayoutDirection.current
-                val bottomBarPadding = innerPadding.calculateBottomPadding()
                 
-                // Exclude bottom padding from content Box so screens draw behind bottom bar
-                val contentPadding = PaddingValues(
-                    start = innerPadding.calculateStartPadding(layoutDirection),
-                    top = innerPadding.calculateTopPadding(),
-                    end = innerPadding.calculateEndPadding(layoutDirection),
-                    bottom = 0.dp
-                )
-
-                // Calculate total bottom padding needed for screen lists to scroll past navbar + MiniPlayer
-                val screenBottomPadding = bottomBarPadding + if (isMiniPlayerVisible) {
-                    if (isTablet) 96.dp else 76.dp
-                } else {
-                    0.dp
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(contentPadding)
-                ) {
-                    NavHost(
-                        navController = navController,
-                        startDestination = Screen.Home.route,
-                        modifier = Modifier.fillMaxSize(),
-                        enterTransition = {
-                            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                            slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 12 }
-                        },
-                        exitTransition = {
-                            fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
-                            slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it / 12 }
-                        },
-                        popEnterTransition = {
-                            fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                            slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { -it / 12 }
-                        },
-                        popExitTransition = {
-                            fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
-                            slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { it / 12 }
-                        }
-                    ) {
-                        composable(Screen.Home.route) {
-                            HomeScreen(
-                                onPlaySong = { isPlayerExpanded = true },
-                                bottomPadding = screenBottomPadding
-                            )
-                        }
-                        composable(Screen.Search.route) {
-                            SearchScreen(
-                                isPlayerExpanded = isPlayerExpanded,
-                                onPlaySong = { isPlayerExpanded = true },
-                                bottomPadding = screenBottomPadding
-                            )
-                        }
-                        composable(Screen.Library.route) {
-                            LibraryScreen(
-                                onPlaySong = { isPlayerExpanded = true },
-                                bottomPadding = screenBottomPadding
-                            )
-                        }
-                    }
-                    
+                if (!isTablet) {
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = !isPlayerExpanded,
+                        visible = isMiniPlayerVisible,
                         enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
                                 slideInVertically(
                                     initialOffsetY = { it / 2 },
@@ -220,10 +223,7 @@ fun MyMusicNavGraph(
                                 ),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .then(
-                                if (isTablet) Modifier.padding(bottom = 16.dp).widthIn(max = 800.dp)
-                                else Modifier.padding(bottom = bottomBarPadding - 4.dp)
-                            )
+                            .padding(bottom = bottomBarPadding - 4.dp)
                     ) {
                         MiniPlayer(
                             onPlayerClick = { isPlayerExpanded = true }
@@ -259,10 +259,6 @@ fun CustomBottomNavigation(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val currentRoute = currentDestination?.route
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -271,33 +267,45 @@ fun CustomBottomNavigation(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .height(64.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { screen ->
-                val isSelected = currentRoute == screen.route
-                NavBarItem(
-                    screen = screen,
-                    isSelected = isSelected,
-                    onClick = {
-                        if (currentRoute != screen.route) {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
+        CustomBottomNavigationContent(navController = navController)
+    }
+}
+
+@Composable
+fun CustomBottomNavigationContent(
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val currentRoute = currentDestination?.route
+
+    Row(
+        modifier = modifier
+            .height(64.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEach { screen ->
+            val isSelected = currentRoute == screen.route
+            NavBarItem(
+                screen = screen,
+                isSelected = isSelected,
+                onClick = {
+                    if (currentRoute != screen.route) {
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
                             }
+                            launchSingleTop = true
+                            restoreState = true
                         }
                     }
-                )
-            }
+                }
+            )
         }
     }
 }

@@ -61,6 +61,7 @@ import com.mymusic.app.ui.components.groupedSongItemShape
 import com.mymusic.app.ui.components.WaveSlider
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,6 +169,7 @@ fun PlayerScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null,
@@ -177,57 +179,7 @@ fun PlayerScreen(
             .then(playerGestureModifier),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar (Collapse & Queue toggle buttons)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = {
-                    if (isTablet) onCollapse() else {
-                        if (showQueue) showQueue = false else onCollapse()
-                    }
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Back",
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Text(
-                text = if (isTablet) "NOW PLAYING" else (if (showQueue) "PLAY QUEUE" else "NOW PLAYING"),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (!isTablet) {
-                IconButton(
-                    onClick = {
-                        if (showQueue) {
-                            viewModel.toggleShuffle()
-                        } else {
-                            showQueue = true
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = if (showQueue) Icons.Rounded.Shuffle else Icons.AutoMirrored.Rounded.QueueMusic,
-                        contentDescription = if (showQueue) "Toggle Shuffle" else "Toggle Queue",
-                        modifier = Modifier.size(28.dp),
-                        tint = if (showQueue && isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(48.dp))
-            }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
 
         if (isTablet) {
             Row(
@@ -326,7 +278,8 @@ fun PlayerScreen(
                     // Queue View
                     QueueView(
                         viewModel = viewModel,
-                        onSwipeDown = { showQueue = false }
+                        onSwipeDown = { showQueue = false },
+                        onBackClick = { showQueue = false }
                     )
                 } else {
                     // Main Player View
@@ -410,14 +363,6 @@ fun PlayerScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    // Download Button
-                                    PlayerScreenDownloadButton(
-                                        song = currentSong,
-                                        viewModel = viewModel
-                                    )
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -495,7 +440,8 @@ fun PlayerScreen(
 fun QueueView(
     viewModel: PlayerViewModel,
     onSwipeDown: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onBackClick: (() -> Unit)? = null
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
@@ -553,6 +499,58 @@ fun QueueView(
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
     ) {
+        if (onBackClick != null) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val backInteractionSource = remember { MutableInteractionSource() }
+                val isBackPressed by backInteractionSource.collectIsPressedAsState()
+                val backScale by animateFloatAsState(
+                    targetValue = if (isBackPressed) 0.85f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "BackScale"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = backScale
+                            scaleY = backScale
+                        }
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .clickable(
+                            interactionSource = backInteractionSource,
+                            indication = null,
+                            onClick = onBackClick
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Play Queue",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+
         if (queue.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -668,43 +666,6 @@ fun QueueView(
 }
 
 @Composable
-private fun PlayerScreenDownloadButton(
-    song: Song,
-    viewModel: PlayerViewModel,
-    modifier: Modifier = Modifier
-) {
-    val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
-    val downloadStates by viewModel.downloadStates.collectAsState()
-    val state = downloadStates[song.id]
-    val isDownloading = state?.isDownloading == true
-    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
-
-    if (isDownloading) {
-        Box(
-            modifier = modifier.size(48.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularWavyProgressIndicator(
-                progress = { state?.progress ?: 0f },
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    } else {
-        IconButton(
-            onClick = { viewModel.downloadSong(song) },
-            modifier = modifier
-        ) {
-            Icon(
-                imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
-                contentDescription = "Download High Quality 320kbps",
-                modifier = Modifier.size(28.dp),
-                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-            )
-        }
-    }
-}
-
-@Composable
 private fun TabletNowPlayingContent(
     song: Song,
     playbackState: com.mymusic.app.player.PlaybackState,
@@ -762,13 +723,6 @@ private fun TabletNowPlayingContent(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            PlayerScreenDownloadButton(
-                song = song,
-                viewModel = viewModel
-            )
         }
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -868,7 +822,7 @@ private fun PlaybackControls(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(26.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
         FilledTonalIconButton(
