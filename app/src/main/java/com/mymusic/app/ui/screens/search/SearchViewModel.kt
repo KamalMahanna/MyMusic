@@ -59,7 +59,7 @@ class SearchViewModel @Inject constructor(
         }
 
         searchJob = viewModelScope.launch {
-            delay(1000) // debounce
+            delay(500) // debounce
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             val songsDeferred = async { musicRepository.searchSongs(query) }
