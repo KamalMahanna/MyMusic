@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
@@ -65,9 +66,9 @@ fun SearchScreen(
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
-    val gridState = rememberLazyGridState()
-
     var selectedCategory by remember { mutableStateOf(SearchCategory.SONGS) }
+
+    val gridState = key(selectedCategory, uiState.query) { rememberLazyGridState() }
 
     LaunchedEffect(uiState.query) {
         if (uiState.query.isBlank()) {
@@ -168,22 +169,15 @@ fun SearchScreen(
                 Text(text = "Error: ${uiState.error}")
             }
         } else {
-            LazyVerticalGrid(
+            key(selectedCategory) {
+                LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isTablet) 4 else 2),
                 state = gridState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = bottomPadding)
+                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
             ) {
                 // 1. Songs Section
                 if (selectedCategory == SearchCategory.SONGS && uiState.songs.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Songs",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
-                        )
-                    }
                     itemsIndexed(
                         items = uiState.songs,
                         key = { _, song -> song.id },
@@ -220,14 +214,6 @@ fun SearchScreen(
 
                 // 2. Albums Section
                 if (selectedCategory == SearchCategory.ALBUMS && uiState.albums.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Albums",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 8.dp)
-                        )
-                    }
                     items(
                         items = uiState.albums,
                         key = { album -> album.id },
@@ -264,14 +250,6 @@ fun SearchScreen(
 
                 // 3. Artists Section
                 if (selectedCategory == SearchCategory.ARTISTS && uiState.artists.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Artists",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 8.dp)
-                        )
-                    }
                     items(
                         items = uiState.artists,
                         key = { artist -> artist.id },
@@ -309,14 +287,6 @@ fun SearchScreen(
 
                 // 4. Playlists Section
                 if (selectedCategory == SearchCategory.PLAYLISTS && uiState.playlists.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Playlists",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 8.dp)
-                        )
-                    }
                     items(
                         items = uiState.playlists,
                         key = { playlist -> playlist.id },
@@ -371,6 +341,7 @@ fun SearchScreen(
             }
         }
     }
+}
 
     if (uiState.isArtistDetailLoading || uiState.isPlaylistDetailLoading || uiState.isAlbumDetailLoading) {
         Box(
