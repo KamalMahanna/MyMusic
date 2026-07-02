@@ -489,6 +489,7 @@ fun QueueView(
     val currentIndex by viewModel.queueIndex.collectAsState()
     val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
     val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
+    val downloadStates by viewModel.downloadStates.collectAsState()
 
     LaunchedEffect(currentIndex, queue) {
         if (queue.isNotEmpty() && currentIndex in queue.indices) {
@@ -625,7 +626,7 @@ fun QueueView(
         } else {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(bottom = 80.dp),
+                contentPadding = PaddingValues(bottom = 16.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 itemsIndexed(
@@ -644,6 +645,10 @@ fun QueueView(
                     val itemShape = remember(index, queue.size) {
                         groupedSongItemShape(index, queue.size)
                     }
+
+                    val isDownloading = downloadStates[song.id]?.isDownloading == true
+                    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
+                    val isPlaying = index == currentIndex
 
                     SwipeToDismissBox(
                         state = dismissState,
@@ -674,30 +679,13 @@ fun QueueView(
                         SongListItem(
                             song = song,
                             onClick = { viewModel.playQueueIndex(index) },
-                            onDownloadClick = {},
-                            isDownloaded = false,
-                            isDownloading = false,
-                            isPlaying = index == currentIndex,
+                            onDownloadClick = { viewModel.downloadSong(song) },
+                            isDownloaded = isDownloaded,
+                            isDownloading = isDownloading,
+                            isPlaying = isPlaying,
+                            downloadProgress = downloadStates[song.id]?.progress,
                             index = index,
-                            totalCount = queue.size,
-                            trailingContent = {
-                                if (index == currentIndex) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
-                                        contentDescription = "Playing",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(12.dp)
-                                    )
-                                } else {
-                                    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
-                                    SongDownloadIndicator(
-                                        songId = song.id,
-                                        playerViewModel = viewModel,
-                                        isDownloaded = isDownloaded,
-                                        onDownloadClick = { viewModel.downloadSong(song) }
-                                    )
-                                }
-                            }
+                            totalCount = queue.size
                         )
                     }
                 }
