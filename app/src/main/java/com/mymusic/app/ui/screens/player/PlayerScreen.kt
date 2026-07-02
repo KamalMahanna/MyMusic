@@ -64,6 +64,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +82,10 @@ fun PlayerScreen(
     val isTablet = configuration.screenWidthDp >= 600
 
     var showQueue by remember { mutableStateOf(false) }
+
+    val queueListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val queue by viewModel.queue.collectAsState()
 
     val density = LocalDensity.current
     var dragOffsetX by remember { mutableStateOf(0f) }
@@ -201,7 +206,14 @@ fun PlayerScreen(
                         song = song,
                         playbackState = playbackState,
                         currentIndex = currentIndex,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onQueueClick = {
+                            coroutineScope.launch {
+                                if (currentIndex in queue.indices) {
+                                    queueListState.animateScrollToItem(currentIndex)
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -226,27 +238,19 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "PLAY QUEUE",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            text = "Play Queue",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        IconButton(onClick = { viewModel.toggleShuffle() }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Shuffle,
-                                contentDescription = "Toggle Shuffle",
-                                modifier = Modifier.size(24.dp),
-                                tint = if (isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                            )
-                        }
                     }
                     QueueView(
                         viewModel = viewModel,
-                        onSwipeDown = {}
+                        onSwipeDown = {},
+                        listState = queueListState
                     )
                 }
             }
@@ -478,13 +482,13 @@ fun QueueView(
     viewModel: PlayerViewModel,
     onSwipeDown: () -> Unit,
     modifier: Modifier = Modifier,
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
+    listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState()
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
     val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
     val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
-    val listState = rememberLazyListState()
 
     LaunchedEffect(currentIndex, queue) {
         if (queue.isNotEmpty() && currentIndex in queue.indices) {
@@ -708,10 +712,13 @@ private fun TabletNowPlayingContent(
     song: Song,
     playbackState: com.mymusic.app.player.PlaybackState,
     currentIndex: Int,
-    viewModel: PlayerViewModel
+    viewModel: PlayerViewModel,
+    onQueueClick: () -> Unit
 ) {
     var prevIndex by remember { mutableStateOf(currentIndex) }
     val isNext = currentIndex >= prevIndex
+
+    val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()
 
     LaunchedEffect(currentIndex) {
         prevIndex = currentIndex
@@ -721,19 +728,19 @@ private fun TabletNowPlayingContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize()
     ) {
-        Spacer(modifier = Modifier.weight(0.5f))
+        Spacer(modifier = Modifier.weight(0.1f))
 
         AsyncImage(
             model = song.highQualityImageUrl,
             contentDescription = "Artwork",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .fillMaxHeight(0.55f)
+                .weight(1f)
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(24.dp))
         )
 
-        Spacer(modifier = Modifier.weight(0.5f))
+        Spacer(modifier = Modifier.weight(0.1f))
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -845,6 +852,16 @@ private fun TabletNowPlayingContent(
             onPreviousClick = { viewModel.playPrevious() },
             onPlayPauseClick = { viewModel.togglePlayPause() },
             onNextClick = { viewModel.playNext() }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        BottomControlsRow(
+            song = song,
+            viewModel = viewModel,
+            isShuffleEnabled = isShuffleEnabled,
+            onShuffleClick = { viewModel.toggleShuffle() },
+            onQueueClick = onQueueClick
         )
 
         Spacer(modifier = Modifier.height(16.dp))
