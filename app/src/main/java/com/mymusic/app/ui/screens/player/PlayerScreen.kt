@@ -39,6 +39,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,7 +60,6 @@ import com.mymusic.app.data.model.Song
 import com.mymusic.app.ui.components.SongDownloadIndicator
 import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.components.groupedSongItemShape
-import com.mymusic.app.ui.components.WaveSlider
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -372,8 +373,14 @@ fun PlayerScreen(
                                 } else 0f
 
                                 var sliderPosition by remember { mutableStateOf<Float?>(null) }
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val sliderColors = SliderDefaults.colors(
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    thumbColor = MaterialTheme.colorScheme.primary
+                                )
 
-                                WaveSlider(
+                                Slider(
                                     value = sliderPosition ?: progress,
                                     onValueChange = { sliderPosition = it },
                                     onValueChangeFinished = {
@@ -382,26 +389,56 @@ fun PlayerScreen(
                                         }
                                         sliderPosition = null
                                     },
-                                    isPlaying = playbackState.isPlaying,
+                                    colors = sliderColors,
+                                    interactionSource = interactionSource,
+                                    thumb = {
+                                        val isPressed by interactionSource.collectIsPressedAsState()
+                                        val isDragged by interactionSource.collectIsDraggedAsState()
+                                        val showTooltip = isPressed || isDragged
+
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.wrapContentSize(unbounded = true)
+                                        ) {
+                                            if (showTooltip) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .layout { measurable, constraints ->
+                                                            val placeable = measurable.measure(constraints)
+                                                            layout(0, 0) {
+                                                                placeable.place(
+                                                                    x = -placeable.width / 2,
+                                                                    y = -placeable.height / 2
+                                                                )
+                                                            }
+                                                        }
+                                                        .offset(y = (-36).dp)
+                                                        .background(
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            shape = RoundedCornerShape(8.dp)
+                                                        )
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    val currentPositionMillis = ((sliderPosition ?: progress) * playbackState.duration).toLong()
+                                                    Text(
+                                                        text = formatMillis(currentPositionMillis),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onPrimary,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+
+                                            SliderDefaults.Thumb(
+                                                interactionSource = interactionSource,
+                                                colors = sliderColors,
+                                                enabled = true
+                                            )
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 )
-
-                                // Progress Time Labels
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = formatMillis(playbackState.currentPosition),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = formatMillis(playbackState.duration),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
@@ -665,6 +702,7 @@ fun QueueView(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TabletNowPlayingContent(
     song: Song,
@@ -731,8 +769,14 @@ private fun TabletNowPlayingContent(
         } else 0f
 
         var sliderPosition by remember { mutableStateOf<Float?>(null) }
+        val interactionSource = remember { MutableInteractionSource() }
+        val sliderColors = SliderDefaults.colors(
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+            thumbColor = MaterialTheme.colorScheme.primary
+        )
 
-        WaveSlider(
+        Slider(
             value = sliderPosition ?: progress,
             onValueChange = { sliderPosition = it },
             onValueChangeFinished = {
@@ -741,25 +785,56 @@ private fun TabletNowPlayingContent(
                 }
                 sliderPosition = null
             },
-            isPlaying = playbackState.isPlaying,
+            colors = sliderColors,
+            interactionSource = interactionSource,
+            thumb = {
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val isDragged by interactionSource.collectIsDraggedAsState()
+                val showTooltip = isPressed || isDragged
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.wrapContentSize(unbounded = true)
+                ) {
+                    if (showTooltip) {
+                        Box(
+                            modifier = Modifier
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    layout(0, 0) {
+                                        placeable.place(
+                                            x = -placeable.width / 2,
+                                            y = -placeable.height / 2
+                                        )
+                                    }
+                                }
+                                .offset(y = (-36).dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val currentPositionMillis = ((sliderPosition ?: progress) * playbackState.duration).toLong()
+                            Text(
+                                text = formatMillis(currentPositionMillis),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    SliderDefaults.Thumb(
+                        interactionSource = interactionSource,
+                        colors = sliderColors,
+                        enabled = true
+                    )
+                }
+            },
             modifier = Modifier.fillMaxWidth()
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatMillis(playbackState.currentPosition),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = formatMillis(playbackState.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
         Spacer(modifier = Modifier.height(4.dp))
 
         Spacer(modifier = Modifier.height(16.dp))
