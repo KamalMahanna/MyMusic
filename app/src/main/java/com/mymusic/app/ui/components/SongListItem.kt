@@ -34,7 +34,42 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mymusic.app.data.model.Song
 
-fun groupedSongItemShape(index: Int, totalCount: Int): RoundedCornerShape {
+fun groupedSongItemShape(
+    index: Int,
+    totalCount: Int,
+    playingIndex: Int? = null
+): RoundedCornerShape {
+    if (playingIndex != null && playingIndex in 0 until totalCount) {
+        return when {
+            index == playingIndex -> RoundedCornerShape(20.dp)
+            index == playingIndex - 1 -> RoundedCornerShape(
+                topStart = if (index == 0) 20.dp else 4.dp,
+                topEnd = if (index == 0) 20.dp else 4.dp,
+                bottomStart = 20.dp,
+                bottomEnd = 20.dp
+            )
+            index == playingIndex + 1 -> RoundedCornerShape(
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomStart = if (index == totalCount - 1) 20.dp else 4.dp,
+                bottomEnd = if (index == totalCount - 1) 20.dp else 4.dp
+            )
+            index == 0 -> RoundedCornerShape(
+                topStart = 20.dp,
+                topEnd = 20.dp,
+                bottomStart = 4.dp,
+                bottomEnd = 4.dp
+            )
+            index == totalCount - 1 -> RoundedCornerShape(
+                topStart = 4.dp,
+                topEnd = 4.dp,
+                bottomStart = 20.dp,
+                bottomEnd = 20.dp
+            )
+            else -> RoundedCornerShape(4.dp)
+        }
+    }
+
     return when {
         totalCount <= 1 -> RoundedCornerShape(20.dp)
         index == 0 -> RoundedCornerShape(
@@ -65,6 +100,7 @@ fun SongListItem(
     downloadProgress: Float? = null,
     index: Int = 0,
     totalCount: Int = 1,
+    playingIndex: Int? = null,
     trailingContent: @Composable (() -> Unit)? = null
 ) {
     val haptics = LocalHapticFeedback.current
@@ -89,7 +125,9 @@ fun SongListItem(
         label = "SongItemBg"
     )
 
-    val itemShape = remember(index, totalCount) { groupedSongItemShape(index, totalCount) }
+    val itemShape = remember(index, totalCount, playingIndex) {
+        groupedSongItemShape(index, totalCount, playingIndex)
+    }
 
     Row(
         modifier = modifier

@@ -642,8 +642,8 @@ fun QueueView(
                         }
                     )
 
-                    val itemShape = remember(index, queue.size) {
-                        groupedSongItemShape(index, queue.size)
+                    val itemShape = remember(index, queue.size, currentIndex) {
+                        groupedSongItemShape(index, queue.size, currentIndex)
                     }
 
                     val isDownloading = downloadStates[song.id]?.isDownloading == true
@@ -685,7 +685,8 @@ fun QueueView(
                             isPlaying = isPlaying,
                             downloadProgress = downloadStates[song.id]?.progress,
                             index = index,
-                            totalCount = queue.size
+                            totalCount = queue.size,
+                            playingIndex = currentIndex
                         )
                     }
                 }

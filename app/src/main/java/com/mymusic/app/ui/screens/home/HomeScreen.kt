@@ -256,6 +256,9 @@ internal fun PlaylistSheetContent(
                 Text("No songs found.")
             }
         } else {
+            val playingIndex = remember(songs, currentPlayingSongId) {
+                songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
+            }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isTablet) 2 else 1),
                 modifier = Modifier
@@ -292,6 +295,7 @@ internal fun PlaylistSheetContent(
                         downloadProgress = downloadStates[song.id]?.progress,
                         index = index,
                         totalCount = songs.size,
+                        playingIndex = playingIndex,
                         modifier = Modifier.animateItem()
                     )
                 }

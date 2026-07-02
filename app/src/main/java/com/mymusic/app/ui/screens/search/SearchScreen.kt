@@ -183,6 +183,9 @@ fun SearchScreen(
                         key = { _, song -> song.id },
                         span = { _, _ -> GridItemSpan(2) } // 2 columns on tablet, 1 column on mobile
                     ) { index, song ->
+                        val playingIndex = remember(uiState.songs, currentPlayingSongId) {
+                            uiState.songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
+                        }
                         val isDownloading = downloadStates[song.id]?.isDownloading == true
                         val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
                         val isPlaying = currentPlayingSongId == song.id
@@ -207,6 +210,7 @@ fun SearchScreen(
                             downloadProgress = downloadStates[song.id]?.progress,
                             index = index,
                             totalCount = uiState.songs.size,
+                            playingIndex = playingIndex,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -420,6 +424,9 @@ fun SearchScreen(
                         Text("No songs found.")
                     }
                 } else {
+                    val playingIndex = remember(topSongs, currentPlayingSongId) {
+                        topSongs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
+                    }
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(if (isTablet) 2 else 1),
                         modifier = Modifier.fillMaxWidth(),
@@ -453,7 +460,8 @@ fun SearchScreen(
                                 isPlaying = isPlaying,
                                 downloadProgress = downloadStates[song.id]?.progress,
                                 index = index,
-                                totalCount = topSongs.size
+                                totalCount = topSongs.size,
+                                playingIndex = playingIndex
                             )
                         }
                     }

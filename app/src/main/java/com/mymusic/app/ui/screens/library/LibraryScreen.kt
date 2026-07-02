@@ -39,6 +39,9 @@ fun LibraryScreen(
 
     val songList = remember(songs) { viewModel.getAsSongList() }
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val playingIndex = remember(songList, currentPlayingSongId) {
+        songList.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
+    }
     
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isTablet) 2 else 1),
@@ -70,6 +73,7 @@ fun LibraryScreen(
                 isPlaying = isPlaying,
                 index = index,
                 totalCount = songList.size,
+                playingIndex = playingIndex,
                 trailingContent = {
                     IconButton(onClick = { viewModel.deleteSong(songs[index]) }) {
                         Icon(
