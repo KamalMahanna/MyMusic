@@ -40,7 +40,7 @@ jobs:
         echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
 
     - name: Build APK
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease -Dorg.gradle.java.home="$JAVA_HOME"
       env:
         APP_VERSION_NAME: ${{ steps.version.outputs.version_name }}
         APP_VERSION_CODE: ${{ github.run_number }}
