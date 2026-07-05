@@ -41,7 +41,7 @@ fun groupedSongItemShape(
 ): RoundedCornerShape {
     if (playingIndex != null && playingIndex in 0 until totalCount) {
         return when {
-            index == playingIndex -> RoundedCornerShape(20.dp)
+            index == playingIndex -> RoundedCornerShape(percent = 50)
             index == playingIndex - 1 -> RoundedCornerShape(
                 topStart = if (index == 0) 20.dp else 4.dp,
                 topEnd = if (index == 0) 20.dp else 4.dp,
