@@ -244,6 +244,16 @@ class MusicPlayerManager @Inject constructor(
             isBuffering = true
         )
 
+        // Reset saved position so the new song always starts from the beginning.
+        // Without this, the position saved during the previous song's playback would be
+        // applied on the next app restart (causing music to play from the wrong point).
+        try {
+            context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reset seek position", e)
+        }
+
         cachingJob?.cancel()
         streamingCacheManager.cleanTempFiles()
         if (readableFile == null && cachedFile == null) {
@@ -567,6 +577,20 @@ class MusicPlayerManager @Inject constructor(
                     lastSong.highQualityImageUrl?.let { android.net.Uri.parse(it) }
                 }
 
+                val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
+
+                // Eagerly update _playbackState BEFORE the artwork coroutine so the mini player
+                // shows up immediately on app start without waiting for artwork to load.
+                _playbackState.value = PlaybackState(
+                    currentSong = lastSong,
+                    isPlaying = false,
+                    isBuffering = false,
+                    currentPosition = savedPos,
+                    duration = 0L
+                )
+                Log.d(TAG, "restoreLastPlayedSong: eagerly set playback state for '${lastSong.name}' at pos=$savedPos")
+
                 scope.launch {
                     val artworkBitmap = withContext(Dispatchers.IO) {
                         try {
@@ -613,21 +637,11 @@ class MusicPlayerManager @Inject constructor(
                         .build()
 
                     player.setMediaItem(mediaItem)
-                    
-                    val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
-                    val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
                     if (savedPos > 0) {
                         player.seekTo(savedPos)
                     }
                     player.prepare()
-
-                    _playbackState.value = PlaybackState(
-                        currentSong = lastSong,
-                        isPlaying = false,
-                        isBuffering = false,
-                        currentPosition = savedPos,
-                        duration = 0L
-                    )
+                    Log.d(TAG, "restoreLastPlayedSong: ExoPlayer prepared at pos=$savedPos")
                 }
             }
         }
