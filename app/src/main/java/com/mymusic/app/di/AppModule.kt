@@ -3,7 +3,10 @@ package com.mymusic.app.di
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import androidx.room.Room
 import com.mymusic.app.data.api.SaavnApi
+import com.mymusic.app.data.local.AppDatabase
+import com.mymusic.app.data.local.DownloadedSongDao
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -98,4 +101,20 @@ object AppModule {
     @Singleton
     fun provideSaavnApi(okHttpClient: OkHttpClient, moshi: Moshi): SaavnApi = 
         com.mymusic.app.data.api.SaavnApiImpl(okHttpClient, moshi)
+
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "mymusic_database"
+        ).fallbackToDestructiveMigration().build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDownloadedSongDao(database: AppDatabase): DownloadedSongDao {
+        return database.downloadedSongDao()
+    }
 }

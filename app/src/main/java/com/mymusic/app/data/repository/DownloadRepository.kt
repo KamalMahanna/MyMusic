@@ -3,6 +3,7 @@ package com.mymusic.app.data.repository
 import android.content.Context
 import android.os.Environment
 import android.util.Log
+import com.mymusic.app.data.local.DownloadedSongDao
 import com.mymusic.app.data.model.DownloadedSong
 import com.mymusic.app.data.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,7 +21,8 @@ import javax.inject.Singleton
 
 @Singleton
 class DownloadRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val downloadedSongDao: DownloadedSongDao
 ) {
     private val _downloadedSongs = MutableStateFlow<List<DownloadedSong>>(emptyList())
     val downloadedSongs: Flow<List<DownloadedSong>> = _downloadedSongs.asStateFlow()
@@ -31,6 +33,17 @@ class DownloadRepository @Inject constructor(
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
+        // Collect DB changes and update StateFlow and in-memory caches
+        repositoryScope.launch {
+            downloadedSongDao.getAllDownloadedSongs().collect { songs ->
+                val sortedSongs = songs.sortedByDescending { it.filePath }
+                _downloadedSongs.value = sortedSongs
+                downloadedFileNames = songs.map { File(it.filePath).name.lowercase() }.toSet()
+                Log.d(TAG, "Database flow emitted ${songs.size} songs. In-memory cache updated.")
+            }
+        }
+        
+        // Initial scan/sync on startup
         repositoryScope.launch {
             refreshDownloadedSongs()
         }
@@ -90,10 +103,11 @@ class DownloadRepository @Inject constructor(
 
     suspend fun refreshDownloadedSongs() = withContext(Dispatchers.IO) {
         val dir = downloadDir
-        Log.d(TAG, "refreshDownloadedSongs: Scanning directory '${dir.absolutePath}'")
+        Log.d(TAG, "refreshDownloadedSongs: Syncing directory '${dir.absolutePath}' with SQLite database")
         if (!dir.exists()) {
-            Log.w(TAG, "refreshDownloadedSongs: directory does not exist")
-            _downloadedSongs.value = emptyList()
+            Log.w(TAG, "refreshDownloadedSongs: directory does not exist, clearing database records")
+            val dbSongs = downloadedSongDao.getAllDownloadedSongsList()
+            dbSongs.forEach { downloadedSongDao.deleteDownloadedSong(it) }
             return@withContext
         }
 
@@ -102,72 +116,98 @@ class DownloadRepository @Inject constructor(
             (ext == "m4a" || ext == "mp3" || ext == "mp4") && it.canRead()
         } ?: emptyList()
 
-        Log.d(TAG, "refreshDownloadedSongs: Found ${files.size} readable matching audio files")
+        Log.d(TAG, "refreshDownloadedSongs: Found ${files.size} readable audio files on disk")
 
-        val songs = files.map { file ->
-            val retriever = android.media.MediaMetadataRetriever()
-            var name = file.nameWithoutExtension
-            var artist = "Unknown Artist"
-            var album: String? = null
-            var duration: Int? = null
-            var imageUrl: String? = null
+        val dbSongs = downloadedSongDao.getAllDownloadedSongsList()
+        val dbSongsByPath = dbSongs.associateBy { it.filePath }
 
-            try {
-                retriever.setDataSource(file.absolutePath)
-                val metaTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
-                val metaArtist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                album = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                duration = durStr?.toIntOrNull()?.let { it / 1000 }
-
-                val parts = file.nameWithoutExtension.split(" - ", limit = 2)
-                val fileTitle = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
-                val fileArtist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
-
-                name = if (!metaTitle.isNullOrBlank()) metaTitle else fileTitle
-                artist = if (!metaArtist.isNullOrBlank() && metaArtist != "Unknown Artist") metaArtist else fileArtist
-
-                if ((artist == "Unknown Artist" || artist.isBlank()) && parts.size > 1) {
-                    name = fileTitle
-                    artist = fileArtist
-                }
-
-                val artworkBytes = retriever.embeddedPicture
-                if (artworkBytes != null) {
-                    val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
-                    if (!cacheFile.exists() || cacheFile.length() != artworkBytes.size.toLong()) {
-                        cacheFile.writeBytes(artworkBytes)
+        // 1. Delete DB entries for files that no longer exist on disk
+        val dbSongsToDelete = dbSongs.filter { !File(it.filePath).exists() }
+        if (dbSongsToDelete.isNotEmpty()) {
+            Log.d(TAG, "refreshDownloadedSongs: Deleting ${dbSongsToDelete.size} missing database entries")
+            dbSongsToDelete.forEach {
+                downloadedSongDao.deleteDownloadedSong(it)
+                if (!it.imageUrl.isNullOrEmpty()) {
+                    val artworkFile = File(it.imageUrl)
+                    if (artworkFile.exists() && artworkFile.absolutePath.startsWith(context.cacheDir.absolutePath)) {
+                        artworkFile.delete()
                     }
-                    imageUrl = cacheFile.absolutePath
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "refreshDownloadedSongs: Error reading metadata for '${file.name}': ${e.message}", e)
-                val parts = file.nameWithoutExtension.split(" - ", limit = 2)
-                name = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
-                artist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
-            } finally {
-                try {
-                    retriever.release()
-                } catch (e: Exception) {
-                    Log.e(TAG, "refreshDownloadedSongs: Error releasing MediaMetadataRetriever", e)
                 }
             }
+        }
 
-            DownloadedSong(
-                id = file.absolutePath.hashCode().toString(),
-                name = name,
-                artist = artist,
-                album = album,
-                duration = duration,
-                filePath = file.absolutePath,
-                imageUrl = imageUrl,
-                fileSize = file.length()
-            )
-        }.sortedByDescending { it.filePath }
+        // 2. Scan and add files that are on disk but not in the database (new or unmigrated downloads)
+        val filesToScan = files.filter { !dbSongsByPath.containsKey(it.absolutePath) }
+        if (filesToScan.isNotEmpty()) {
+            Log.d(TAG, "refreshDownloadedSongs: Scanning ${filesToScan.size} new/untracked files on disk")
+            val songsToInsert = filesToScan.map { file ->
+                val retriever = android.media.MediaMetadataRetriever()
+                var name = file.nameWithoutExtension
+                var artist = "Unknown Artist"
+                var album: String? = null
+                var duration: Int? = null
+                var imageUrl: String? = null
 
-        Log.d(TAG, "refreshDownloadedSongs: Refreshed ${songs.size} songs in StateFlow")
-        _downloadedSongs.value = songs
-        downloadedFileNames = files.map { it.name.lowercase() }.toSet()
+                try {
+                    retriever.setDataSource(file.absolutePath)
+                    val metaTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    val metaArtist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    album = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                    val durStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    duration = durStr?.toIntOrNull()?.let { it / 1000 }
+
+                    val parts = file.nameWithoutExtension.split(" - ", limit = 2)
+                    val fileTitle = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
+                    val fileArtist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
+
+                    name = if (!metaTitle.isNullOrBlank()) metaTitle else fileTitle
+                    artist = if (!metaArtist.isNullOrBlank() && metaArtist != "Unknown Artist") metaArtist else fileArtist
+
+                    if ((artist == "Unknown Artist" || artist.isBlank()) && parts.size > 1) {
+                        name = fileTitle
+                        artist = fileArtist
+                    }
+
+                    val artworkBytes = retriever.embeddedPicture
+                    if (artworkBytes != null) {
+                        val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
+                        if (!cacheFile.exists() || cacheFile.length() != artworkBytes.size.toLong()) {
+                            cacheFile.writeBytes(artworkBytes)
+                        }
+                        imageUrl = cacheFile.absolutePath
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "refreshDownloadedSongs: Error reading metadata for '${file.name}': ${e.message}", e)
+                    val parts = file.nameWithoutExtension.split(" - ", limit = 2)
+                    name = if (parts.size > 1) parts[0].trim() else file.nameWithoutExtension
+                    artist = if (parts.size > 1) parts[1].trim() else "Unknown Artist"
+                } finally {
+                    try {
+                        retriever.release()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "refreshDownloadedSongs: Error releasing MediaMetadataRetriever", e)
+                    }
+                }
+
+                DownloadedSong(
+                    id = file.absolutePath.hashCode().toString(),
+                    name = name,
+                    artist = artist,
+                    album = album,
+                    duration = duration,
+                    filePath = file.absolutePath,
+                    imageUrl = imageUrl,
+                    fileSize = file.length()
+                )
+            }
+            
+            if (songsToInsert.isNotEmpty()) {
+                downloadedSongDao.insertDownloadedSongs(songsToInsert)
+                Log.d(TAG, "refreshDownloadedSongs: Successfully cached ${songsToInsert.size} new songs in SQLite")
+            }
+        } else {
+            Log.d(TAG, "refreshDownloadedSongs: Cache is fully synchronized with disk. No scans needed.")
+        }
     }
 
     fun getCachedArtworkForSong(song: Song): File? {
@@ -194,7 +234,7 @@ class DownloadRepository @Inject constructor(
                 val artworkDeleted = cacheFile.delete()
                 Log.d(TAG, "deleteSong: Deleted cached artwork: $artworkDeleted")
             }
-            refreshDownloadedSongs()
+            downloadedSongDao.deleteDownloadedSong(song)
         }
         deleted
     }

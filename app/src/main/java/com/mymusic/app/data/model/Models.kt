@@ -1,6 +1,8 @@
 package com.mymusic.app.data.model
 
 import androidx.compose.runtime.Immutable
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import com.squareup.moshi.JsonClass
 
 @Immutable
@@ -280,9 +282,10 @@ data class ModuleSection(
     val data: List<ModuleItem> = emptyList()
 )
 
+@Entity(tableName = "downloaded_songs")
 @Immutable
 data class DownloadedSong(
-    val id: String,
+    @PrimaryKey val id: String,
     val name: String,
     val artist: String,
     val album: String?,
