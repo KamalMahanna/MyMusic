@@ -6,8 +6,11 @@ import com.mymusic.app.data.model.DownloadedSong
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.DownloadRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -19,6 +22,23 @@ class LibraryViewModel @Inject constructor(
 
     val downloadedSongs: StateFlow<List<DownloadedSong>> = downloadRepository.downloadedSongs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    /** Downloaded songs filtered by the current search query (name or artist). */
+    val filteredDownloadedSongs: StateFlow<List<DownloadedSong>> =
+        combine(downloadedSongs, _searchQuery) { songs, query ->
+            if (query.isBlank()) {
+                songs
+            } else {
+                val lower = query.lowercase()
+                songs.filter { song ->
+                    song.name.lowercase().contains(lower) ||
+                        song.artist.lowercase().contains(lower)
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         refresh()
@@ -35,9 +55,17 @@ class LibraryViewModel @Inject constructor(
             downloadRepository.deleteSong(song)
         }
     }
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
     
-    fun getAsSongList(): List<Song> {
-        return downloadedSongs.value.map { ds ->
+    fun getAsSongList(songs: List<DownloadedSong> = filteredDownloadedSongs.value): List<Song> {
+        return songs.map { ds ->
             Song(
                 id = ds.id,
                 name = ds.name,

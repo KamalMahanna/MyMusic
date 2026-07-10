@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import com.mymusic.app.data.api.SaavnApi
+import com.mymusic.app.data.NetworkConnectivityObserver
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -98,4 +99,9 @@ object AppModule {
     @Singleton
     fun provideSaavnApi(okHttpClient: OkHttpClient, moshi: Moshi): SaavnApi = 
         com.mymusic.app.data.api.SaavnApiImpl(okHttpClient, moshi)
+
+    @Provides
+    @Singleton
+    fun provideNetworkConnectivityObserver(@ApplicationContext context: Context): NetworkConnectivityObserver =
+        NetworkConnectivityObserver(context)
 }

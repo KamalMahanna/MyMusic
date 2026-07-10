@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.mymusic.app.player.MusicService
 import com.mymusic.app.player.QueueManager
+import com.mymusic.app.data.NetworkConnectivityObserver
 import com.mymusic.app.ui.navigation.MyMusicNavGraph
 import com.mymusic.app.ui.theme.MyMusicTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,6 +25,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var queueManager: QueueManager
+
+    @Inject
+    lateinit var networkConnectivityObserver: NetworkConnectivityObserver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val isTablet = resources.configuration.smallestScreenWidthDp >= 600
@@ -56,9 +60,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MyMusicNavGraph()
+                    MyMusicNavGraph(
+                        networkConnectivityObserver = networkConnectivityObserver
+                    )
                 }
             }
         }
     }
 }
+

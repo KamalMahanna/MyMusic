@@ -61,7 +61,9 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mymusic.app.data.NetworkConnectivityObserver
 import com.mymusic.app.ui.screens.player.PlayerViewModel
 import com.mymusic.app.ui.components.MiniPlayer
 import com.mymusic.app.ui.screens.home.HomeScreen
@@ -77,6 +79,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import javax.inject.Inject
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Home", Icons.Rounded.Home)
@@ -92,7 +95,8 @@ val items = listOf(
 
 @Composable
 fun MyMusicNavGraph(
-    playerViewModel: PlayerViewModel = hiltViewModel()
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    networkConnectivityObserver: NetworkConnectivityObserver
 ) {
     val navController = rememberNavController()
     var isPlayerExpanded by remember { mutableStateOf(false) }
@@ -103,10 +107,48 @@ fun MyMusicNavGraph(
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600
 
+    // Observe network connectivity
+    val isConnected by networkConnectivityObserver.isConnected.collectAsState()
+    val isOffline = !isConnected
+
+    // Determine start destination once based on initial connectivity.
+    // This avoids the race where LaunchedEffect fires before NavHost is ready.
+    val startDestination = remember {
+        if (networkConnectivityObserver.isConnected.value) {
+            Screen.Home.route
+        } else {
+            Screen.Library.route
+        }
+    }
+
+    // When connectivity changes at runtime, force-navigate to Library (offline)
+    // or allow free navigation (online). We skip the initial composition since
+    // startDestination already handles it.
+    var hasInitialized by remember { mutableStateOf(false) }
+    LaunchedEffect(isOffline) {
+        if (!hasInitialized) {
+            hasInitialized = true
+            return@LaunchedEffect
+        }
+        if (isOffline) {
+            val currentRoute = navController.currentBackStackEntry?.destination?.route
+            if (currentRoute != Screen.Library.route) {
+                navController.navigate(Screen.Library.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
                 if (isTablet) {
+                    // Tablet: nav tabs + mini player in a row
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -115,8 +157,23 @@ fun MyMusicNavGraph(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CustomBottomNavigationContent(navController = navController)
-                        
+                        // Only hide the nav tabs when offline, not the mini player
+                        AnimatedVisibility(
+                            visible = !isOffline,
+                            enter = fadeIn(animationSpec = tween(300)) +
+                                    slideInHorizontally(
+                                        initialOffsetX = { -it },
+                                        animationSpec = tween(350, easing = FastOutSlowInEasing)
+                                    ),
+                            exit = fadeOut(animationSpec = tween(200)) +
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -it },
+                                        animationSpec = tween(350, easing = FastOutSlowInEasing)
+                                    )
+                        ) {
+                            CustomBottomNavigationContent(navController = navController)
+                        }
+
                         androidx.compose.animation.AnimatedVisibility(
                             visible = isMiniPlayerVisible,
                             enter = fadeIn(animationSpec = tween(durationMillis = 200)) + 
@@ -139,7 +196,22 @@ fun MyMusicNavGraph(
                         }
                     }
                 } else {
-                    CustomBottomNavigation(navController = navController)
+                    // Phone: hide only the nav tabs when offline
+                    AnimatedVisibility(
+                        visible = !isOffline,
+                        enter = fadeIn(animationSpec = tween(300)) +
+                                slideInVertically(
+                                    initialOffsetY = { it },
+                                    animationSpec = tween(350, easing = FastOutSlowInEasing)
+                                ),
+                        exit = fadeOut(animationSpec = tween(200)) +
+                                slideOutVertically(
+                                    targetOffsetY = { it },
+                                    animationSpec = tween(350, easing = FastOutSlowInEasing)
+                                )
+                    ) {
+                        CustomBottomNavigation(navController = navController)
+                    }
                 }
             }
         ) { innerPadding ->
@@ -155,7 +227,10 @@ fun MyMusicNavGraph(
             )
 
             // Calculate total bottom padding needed for screen lists to scroll past navbar + MiniPlayer
-            val screenBottomPadding = if (isTablet) {
+            val screenBottomPadding = if (isOffline) {
+                // When offline, no bottom bar — only account for MiniPlayer
+                if (isMiniPlayerVisible) 76.dp else 0.dp
+            } else if (isTablet) {
                 bottomBarPadding
             } else {
                 bottomBarPadding + if (isMiniPlayerVisible) 76.dp else 0.dp
@@ -168,7 +243,7 @@ fun MyMusicNavGraph(
             ) {
                 NavHost(
                     navController = navController,
-                    startDestination = Screen.Home.route,
+                    startDestination = startDestination,
                     modifier = Modifier.fillMaxSize(),
                     enterTransition = {
                         fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
@@ -203,7 +278,8 @@ fun MyMusicNavGraph(
                     composable(Screen.Library.route) {
                         LibraryScreen(
                             onPlaySong = { isPlayerExpanded = true },
-                            bottomPadding = screenBottomPadding
+                            bottomPadding = screenBottomPadding,
+                            isOffline = isOffline
                         )
                     }
                 }
@@ -223,7 +299,7 @@ fun MyMusicNavGraph(
                                 ),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = bottomBarPadding - 4.dp)
+                            .padding(bottom = if (isOffline) 12.dp else bottomBarPadding - 4.dp)
                     ) {
                         MiniPlayer(
                             onPlayerClick = { isPlayerExpanded = true }
