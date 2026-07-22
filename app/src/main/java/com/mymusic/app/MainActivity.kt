@@ -36,37 +36,48 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var downloadRepository: DownloadRepository
 
-    private val storagePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Log.d(TAG, "Storage permission granted — triggering download scan")
+    private val permissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        val isAudioGranted = permissions[audioPermission] ?: (
+            ContextCompat.checkSelfPermission(this, audioPermission) == PackageManager.PERMISSION_GRANTED
+        )
+
+        if (isAudioGranted) {
+            Log.d(TAG, "Audio storage permission granted — triggering download scan")
             CoroutineScope(Dispatchers.IO).launch {
                 downloadRepository.refreshDownloadedSongs()
             }
         } else {
-            Log.w(TAG, "Storage permission denied")
+            Log.w(TAG, "Audio storage permission denied")
         }
-    }
 
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Log.d(TAG, "Notification permission granted — media controls will appear")
-            // Re-start MusicService so the notification is posted now that permission is granted
-            if (queueManager.currentSong != null) {
-                try {
-                    ContextCompat.startForegroundService(
-                        this,
-                        Intent(this, MusicService::class.java)
-                    )
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to restart MusicService after notification permission: ${e.message}", e)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val isNotificationGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: (
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            )
+
+            if (isNotificationGranted) {
+                Log.d(TAG, "Notification permission granted — media controls will appear")
+                if (queueManager.currentSong != null) {
+                    try {
+                        ContextCompat.startForegroundService(
+                            this,
+                            Intent(this, MusicService::class.java)
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to restart MusicService after notification permission: ${e.message}", e)
+                    }
                 }
+            } else {
+                Log.w(TAG, "Notification permission denied — media controls will not appear")
             }
-        } else {
-            Log.w(TAG, "Notification permission denied — media controls will not appear")
         }
     }
 
@@ -81,10 +92,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Request notification permission first (Android 13+) so the media notification
-        // can be posted. Without this, media controls won't appear on the lock screen
-        // or notification shade on Android 13+ devices.
-        requestNotificationPermissionIfNeeded()
+        // Request all required permissions together
+        requestPermissionsIfNeeded()
 
         // If there is a previously saved song, start MusicService eagerly so that
         // restoreLastPlayedSong() runs immediately and the mini player appears on launch.
@@ -100,9 +109,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Request storage permission so the download scanner can read Music/MyMusic
-        requestStoragePermissionIfNeeded()
-
         setContent {
             MyMusicTheme {
                 Surface(
@@ -115,39 +121,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permission = Manifest.permission.POST_NOTIFICATIONS
-            when {
-                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                    Log.d(TAG, "Notification permission already granted")
-                }
-                else -> {
-                    Log.d(TAG, "Requesting notification permission")
-                    notificationPermissionLauncher.launch(permission)
-                }
-            }
-        }
-    }
+    private fun requestPermissionsIfNeeded() {
+        val permissionsToRequest = mutableListOf<String>()
 
-    private fun requestStoragePermissionIfNeeded() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_AUDIO
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
-        when {
-            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                Log.d(TAG, "Storage permission already granted — triggering download scan")
-                CoroutineScope(Dispatchers.IO).launch {
-                    downloadRepository.refreshDownloadedSongs()
-                }
+        if (ContextCompat.checkSelfPermission(this, audioPermission) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(audioPermission)
+        } else {
+            Log.d(TAG, "Audio storage permission already granted — triggering download scan")
+            CoroutineScope(Dispatchers.IO).launch {
+                downloadRepository.refreshDownloadedSongs()
             }
-            else -> {
-                Log.d(TAG, "Requesting storage permission: $permission")
-                storagePermissionLauncher.launch(permission)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationPermission = Manifest.permission.POST_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(this, notificationPermission) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(notificationPermission)
+            } else {
+                Log.d(TAG, "Notification permission already granted")
             }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            Log.d(TAG, "Requesting permissions: $permissionsToRequest")
+            permissionsLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 
