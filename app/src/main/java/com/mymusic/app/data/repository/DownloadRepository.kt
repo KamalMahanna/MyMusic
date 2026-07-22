@@ -1,7 +1,10 @@
 package com.mymusic.app.data.repository
 
+import android.content.ContentUris
 import android.content.Context
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import com.mymusic.app.data.local.DownloadedSongDao
 import com.mymusic.app.data.model.DownloadedSong
@@ -225,9 +228,17 @@ class DownloadRepository @Inject constructor(
     suspend fun deleteSong(song: DownloadedSong): Boolean = withContext(Dispatchers.IO) {
         val file = File(song.filePath)
         Log.d(TAG, "deleteSong: Deleting file '${file.absolutePath}'")
-        val deleted = file.delete()
-        Log.d(TAG, "deleteSong: Deletion status: $deleted")
-        if (deleted) {
+        var deleted = file.delete()
+        Log.d(TAG, "deleteSong: File.delete() status: $deleted")
+
+        // If File.delete() fails (e.g. scoped storage — file was created by a
+        // previous app installation), try deleting via MediaStore ContentResolver.
+        if (!deleted && file.exists()) {
+            deleted = deleteViaMediaStore(file)
+            Log.d(TAG, "deleteSong: MediaStore deletion status: $deleted")
+        }
+
+        if (deleted || !file.exists()) {
             // Also clean up cached artwork
             val cacheFile = File(context.cacheDir, "artwork_${file.nameWithoutExtension}.jpg")
             if (cacheFile.exists()) {
@@ -236,7 +247,40 @@ class DownloadRepository @Inject constructor(
             }
             downloadedSongDao.deleteDownloadedSong(song)
         }
-        deleted
+        deleted || !file.exists()
+    }
+
+    /**
+     * Delete a media file via the MediaStore ContentResolver.
+     * This handles files not owned by the current app installation (scoped storage).
+     */
+    private fun deleteViaMediaStore(file: File): Boolean {
+        return try {
+            val contentResolver = context.contentResolver
+            val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            } else {
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            }
+
+            // Find the MediaStore entry for this file
+            val selection = MediaStore.Audio.Media.DATA + "=?"
+            val selectionArgs = arrayOf(file.absolutePath)
+
+            // Try direct deletion first
+            val rowsDeleted = contentResolver.delete(collection, selection, selectionArgs)
+            Log.d(TAG, "deleteViaMediaStore: ContentResolver.delete() removed $rowsDeleted rows")
+            rowsDeleted > 0
+        } catch (e: SecurityException) {
+            // On Android 11+, deleting files owned by others throws RecoverableSecurityException.
+            // Since we have MANAGE_EXTERNAL_STORAGE or the file is in our app's contributed media,
+            // this fallback should rarely be needed. Log it for debugging.
+            Log.e(TAG, "deleteViaMediaStore: SecurityException — cannot delete file", e)
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteViaMediaStore: Unexpected error", e)
+            false
+        }
     }
 
     companion object {
