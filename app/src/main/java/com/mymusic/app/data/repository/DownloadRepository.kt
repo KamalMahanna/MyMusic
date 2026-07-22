@@ -1,6 +1,5 @@
 package com.mymusic.app.data.repository
 
-import android.content.ContentUris
 import android.content.Context
 import android.os.Build
 import android.os.Environment

@@ -1,8 +1,6 @@
 package com.mymusic.app.di
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.room.Room
 import com.mymusic.app.data.api.SaavnApi
 import com.mymusic.app.data.local.AppDatabase

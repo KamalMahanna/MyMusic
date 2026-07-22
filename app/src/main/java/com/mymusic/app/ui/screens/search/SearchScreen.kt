@@ -40,7 +40,6 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 
 import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.screens.player.PlayerViewModel
