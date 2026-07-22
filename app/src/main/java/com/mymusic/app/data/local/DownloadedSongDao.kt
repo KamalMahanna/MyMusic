@@ -17,14 +17,8 @@ interface DownloadedSongDao {
     suspend fun getAllDownloadedSongsList(): List<DownloadedSong>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDownloadedSong(song: DownloadedSong)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDownloadedSongs(songs: List<DownloadedSong>)
 
     @Delete
     suspend fun deleteDownloadedSong(song: DownloadedSong)
-
-    @Query("DELETE FROM downloaded_songs WHERE id = :id")
-    suspend fun deleteDownloadedSongById(id: String)
 }

@@ -5,7 +5,6 @@ import com.mymusic.app.data.model.*
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.delay
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,7 +28,6 @@ class SaavnApiImpl @Inject constructor(
     )
 
     private val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
-    private val listType = Types.newParameterizedType(List::class.java, Any::class.java)
 
     private val channelStations = mapOf(
         "27" to StationInfo("Pyaar Ka Safar", "hindi", "Romance"),
@@ -114,14 +112,6 @@ class SaavnApiImpl @Inject constructor(
     private fun parseJsonToMap(json: String): Map<String, Any?>? {
         return try {
             moshi.adapter<Map<String, Any?>>(mapType).fromJson(json)
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun parseJsonToList(json: String): List<Any?>? {
-        return try {
-            moshi.adapter<List<Any?>>(listType).fromJson(json)
         } catch (e: Exception) {
             null
         }

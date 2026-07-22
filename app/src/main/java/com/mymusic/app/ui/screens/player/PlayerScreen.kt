@@ -5,7 +5,6 @@ package com.mymusic.app.ui.screens.player
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -57,13 +56,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.mymusic.app.data.model.Song
-import com.mymusic.app.ui.components.SongDownloadIndicator
 import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.components.groupedSongItemShape
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -21,7 +21,6 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val sections: List<ModuleSection> = emptyList(),
     val error: String? = null,
-    val isItemLoading: Boolean = false,
     val selectedPlaylist: Playlist? = null,
     val selectedAlbum: Album? = null
 )

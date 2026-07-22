@@ -301,13 +301,6 @@ data class DownloadedSong(
             val sec = d % 60
             return "%d:%02d".format(min, sec)
         }
-    
-    val fileSizeFormatted: String
-        get() {
-            val kb = fileSize / 1024.0
-            val mb = kb / 1024.0
-            return if (mb >= 1) "%.1f MB".format(mb) else "%.0f KB".format(kb)
-        }
 }
 
 fun String.unescapeHtml(): String {
