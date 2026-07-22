@@ -49,6 +49,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d(TAG, "Notification permission granted — media controls will appear")
+            // Re-start MusicService so the notification is posted now that permission is granted
+            if (queueManager.currentSong != null) {
+                try {
+                    ContextCompat.startForegroundService(
+                        this,
+                        Intent(this, MusicService::class.java)
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to restart MusicService after notification permission: ${e.message}", e)
+                }
+            }
+        } else {
+            Log.w(TAG, "Notification permission denied — media controls will not appear")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val isTablet = resources.configuration.smallestScreenWidthDp >= 600
         requestedOrientation = if (isTablet) {
@@ -59,6 +80,11 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Request notification permission first (Android 13+) so the media notification
+        // can be posted. Without this, media controls won't appear on the lock screen
+        // or notification shade on Android 13+ devices.
+        requestNotificationPermissionIfNeeded()
 
         // If there is a previously saved song, start MusicService eagerly so that
         // restoreLastPlayedSong() runs immediately and the mini player appears on launch.
@@ -84,6 +110,21 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MyMusicNavGraph()
+                }
+            }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+            when {
+                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "Notification permission already granted")
+                }
+                else -> {
+                    Log.d(TAG, "Requesting notification permission")
+                    notificationPermissionLauncher.launch(permission)
                 }
             }
         }
