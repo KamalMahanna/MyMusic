@@ -79,7 +79,10 @@ class MusicService : MediaLibraryService() {
         })
             .setSessionActivity(pendingIntent)
             .build()
-        Log.d(TAG, "MediaLibrarySession successfully built and set up")
+        // Register with Media3's notification system so MediaStyle controls appear
+        // in the notification panel and Quick Settings media player.
+        addSession(mediaSession!!)
+        Log.d(TAG, "MediaLibrarySession successfully built and registered")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
