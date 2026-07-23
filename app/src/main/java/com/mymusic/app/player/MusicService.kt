@@ -3,7 +3,9 @@ package com.mymusic.app.player
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
@@ -11,6 +13,8 @@ import androidx.core.app.NotificationCompat
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.mymusic.app.MainActivity
@@ -23,9 +27,15 @@ class MusicService : MediaLibraryService() {
     @Inject
     lateinit var musicPlayerManager: MusicPlayerManager
 
+    @Inject
+    lateinit var queueManager: QueueManager
+
+    private lateinit var sharedPreferences: SharedPreferences
+
     override fun onCreate() {
         Log.d(TAG, "onCreate() service started")
         super.onCreate()
+        sharedPreferences = getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
         createNotificationChannel()
         promoteToForegroundImmediate()
 
@@ -39,7 +49,34 @@ class MusicService : MediaLibraryService() {
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        mediaSession = MediaLibrarySession.Builder(this, player, object : MediaLibrarySession.Callback {})
+        mediaSession = MediaLibrarySession.Builder(this, player, object : MediaLibrarySession.Callback {
+            override fun onPlaybackResumption(
+                mediaSession: MediaSession,
+                controller: MediaSession.ControllerInfo
+            ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                Log.d(TAG, "onPlaybackResumption: System UI requested playback resumption")
+                val songs = queueManager.queue.value
+                val currentIndex = queueManager.currentIndex.value
+                val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
+
+                if (songs.isEmpty()) {
+                    Log.w(TAG, "onPlaybackResumption: no songs in queue to resume")
+                    return Futures.immediateFailedFuture(
+                        UnsupportedOperationException("No songs to resume")
+                    )
+                }
+
+                val mediaItems = songs.map { song ->
+                    musicPlayerManager.buildMediaItemForResumption(song)
+                }
+                val startIndex = if (currentIndex in songs.indices) currentIndex else 0
+
+                Log.d(TAG, "onPlaybackResumption: restoring ${mediaItems.size} items, startIndex=$startIndex, startPos=$savedPos")
+                return Futures.immediateFuture(
+                    MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, savedPos)
+                )
+            }
+        })
             .setSessionActivity(pendingIntent)
             .build()
         Log.d(TAG, "MediaLibrarySession successfully built and set up")
@@ -90,10 +127,16 @@ class MusicService : MediaLibraryService() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d(TAG, "onTaskRemoved() called. App swiped away from recent tasks.")
         val player = mediaSession?.player
-        if (player != null) {
+        if (player != null && player.playWhenReady && player.mediaItemCount > 0) {
+            // Pause playback but keep the service alive so System UI can still
+            // show the media resumption card in the notification shade.
+            Log.d(TAG, "Pausing playback but keeping service alive for media resumption")
             player.pause()
+        } else {
+            // Nothing playing — safe to tear down the service entirely.
+            Log.d(TAG, "No active playback, stopping service")
+            stopSelf()
         }
-        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 

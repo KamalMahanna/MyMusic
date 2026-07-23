@@ -542,6 +542,56 @@ class MusicPlayerManager @Inject constructor(
         forwardingPlayer = null
     }
 
+    /**
+     * Builds a lightweight [MediaItem] for a [Song] suitable for System UI media resumption.
+     * Uses only URIs (no bitmap bytes) so it can be called synchronously without I/O.
+     * System UI will fetch artwork from the URI on its own.
+     */
+    fun buildMediaItemForResumption(song: Song): MediaItem {
+        val readableFile = downloadRepository.getReadableFileForSong(song)
+        val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
+
+        val uri = when {
+            song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
+                val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
+                val customFile = java.io.File(filePath)
+                if (customFile.exists() && customFile.canRead()) {
+                    if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
+                    else song.url
+                } else {
+                    when {
+                        readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
+                        cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
+                        else -> song.highQualityDownloadUrl ?: ""
+                    }
+                }
+            }
+            readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
+            cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
+            else -> song.highQualityDownloadUrl ?: ""
+        }
+
+        val localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
+        val artworkUri = if (localArtworkFile != null) {
+            android.net.Uri.fromFile(localArtworkFile)
+        } else {
+            song.highQualityImageUrl?.let { android.net.Uri.parse(it) }
+        }
+
+        val metadata = MediaMetadata.Builder()
+            .setTitle(song.name)
+            .setArtist(song.primaryArtistNames)
+            .setAlbumTitle(song.album.name)
+            .setArtworkUri(artworkUri)
+            .build()
+
+        return MediaItem.Builder()
+            .setMediaId(song.id)
+            .setUri(uri)
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
     private fun restoreLastPlayedSong(player: Player) {
         val lastSong = queueManager.currentSong
         if (lastSong != null) {
