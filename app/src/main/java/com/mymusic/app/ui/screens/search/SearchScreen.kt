@@ -367,11 +367,11 @@ fun SearchScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                         .padding(bottom = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -409,7 +409,7 @@ fun SearchScreen(
                     text = "Top Songs",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
                 val topSongs = artistDetail.topSongs ?: emptyList()

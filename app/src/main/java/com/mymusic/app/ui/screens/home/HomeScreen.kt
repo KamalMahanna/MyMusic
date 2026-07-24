@@ -193,11 +193,11 @@ internal fun PlaylistSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.8f)
-            .padding(horizontal = 16.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -318,11 +318,11 @@ internal fun AlbumSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.8f)
-            .padding(horizontal = 16.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

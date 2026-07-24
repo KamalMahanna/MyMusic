@@ -273,7 +273,6 @@ fun PlayerScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 24.dp)
             ) { isQueueVisible ->
                 if (isQueueVisible) {
                     // Queue View
@@ -293,7 +292,9 @@ fun PlayerScreen(
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
                     ) {
                         // Only Artwork & Info transitions horizontally
                         AnimatedContent(
@@ -542,6 +543,7 @@ fun QueueView(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 0.dp)
                     .padding(bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
