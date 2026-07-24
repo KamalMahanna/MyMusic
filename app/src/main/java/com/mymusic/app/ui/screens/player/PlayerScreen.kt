@@ -330,7 +330,7 @@ fun PlayerScreen(
                                     contentDescription = "Artwork",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .fillMaxWidth(0.85f)
+                                        .fillMaxWidth()
                                         .aspectRatio(1f)
                                         .clip(RoundedCornerShape(24.dp))
                                 )
