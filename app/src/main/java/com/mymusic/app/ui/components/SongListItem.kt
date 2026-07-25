@@ -86,7 +86,7 @@ fun SongListItem(
 
     val baseModifier = modifier
         .fillMaxWidth()
-        .padding(horizontal = 4.dp, vertical = 2.dp)
+        .padding(horizontal = 4.dp, vertical = 3.dp)
         .graphicsLayer {
             scaleX = itemScale
             scaleY = itemScale
@@ -104,7 +104,7 @@ fun SongListItem(
                     onClick()
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     } else {
         baseModifier
             .clickable(
@@ -115,7 +115,7 @@ fun SongListItem(
                     onClick()
                 }
             )
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 10.dp, vertical = 10.dp)
     }
 
     Row(
@@ -127,11 +127,11 @@ fun SongListItem(
             contentDescription = "Song Artwork",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(48.dp)
+                .size(56.dp)
                 .clip(CircleShape)
         )
         
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(16.dp))
         
         Column(
             modifier = Modifier.weight(1f)
@@ -144,7 +144,7 @@ fun SongListItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = song.primaryArtistNames,
                 style = MaterialTheme.typography.bodyMedium,
@@ -167,12 +167,12 @@ fun SongListItem(
             )
         } else if (isDownloading) {
             Box(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularWavyProgressIndicator(
                     progress = { downloadProgress ?: 0f },
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         } else {
