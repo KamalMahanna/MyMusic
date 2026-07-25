@@ -403,10 +403,10 @@ fun PlayerScreen(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(14.dp),
+                                                .height(18.dp),
                                             color = MaterialTheme.colorScheme.primary,
                                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            amplitude = { if (playbackState.isPlaying) 0.35f else 0.0f },
+                                            amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
                                             wavelength = 40.dp,
                                             stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
                                             trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
@@ -803,10 +803,10 @@ private fun TabletNowPlayingContent(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(14.dp),
+                        .height(18.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    amplitude = { if (playbackState.isPlaying) 0.35f else 0.0f },
+                    amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
                     wavelength = 40.dp,
                     stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
                     trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
