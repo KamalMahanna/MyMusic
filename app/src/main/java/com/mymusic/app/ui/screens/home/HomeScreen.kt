@@ -36,7 +36,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -216,27 +221,51 @@ internal fun PlaylistSheetContent(
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
+    var bottomOverscrollOffset by remember { mutableFloatStateOf(0f) }
+    val animatedOverscrollOffset by animateFloatAsState(
+        targetValue = bottomOverscrollOffset,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "PlaylistSongListOverscroll"
+    )
+
     val preventUpwardSheetBounce = remember {
         object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (bottomOverscrollOffset < 0f && available.y > 0) {
+                    val newOffset = (bottomOverscrollOffset + available.y).coerceAtMost(0f)
+                    val consumedY = newOffset - bottomOverscrollOffset
+                    bottomOverscrollOffset = newOffset
+                    return Offset(0f, consumedY)
+                }
+                return Offset.Zero
+            }
+
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
                 // available.y < 0 is unconsumed upward scroll (swiping up at bottom of list).
-                // Consume it so ModalBottomSheet's drag handler does not get pushed upward,
-                // preventing infinite spring oscillation / rapid bouncing.
-                return if (available.y < 0) {
-                    Offset(0f, available.y)
-                } else {
-                    Offset.Zero
+                // Consume it and apply elastic bounce offset to song list tiles,
+                // while preventing ModalBottomSheet drag handler from pushing outer sheet upward.
+                if (available.y < 0) {
+                    bottomOverscrollOffset = (bottomOverscrollOffset + available.y * 0.25f).coerceAtLeast(-50f)
+                    return Offset(0f, available.y)
                 }
+                return Offset.Zero
             }
 
             override suspend fun onPostFling(
                 consumed: Velocity,
                 available: Velocity
             ): Velocity {
+                bottomOverscrollOffset = 0f
                 return if (available.y < 0) {
                     Velocity(0f, available.y)
                 } else {
@@ -391,7 +420,10 @@ internal fun PlaylistSheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .nestedScroll(preventUpwardSheetBounce),
+                        .nestedScroll(preventUpwardSheetBounce)
+                        .graphicsLayer {
+                            translationY = animatedOverscrollOffset
+                        },
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     itemsIndexed(
@@ -448,24 +480,48 @@ internal fun AlbumSheetContent(
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
+    var bottomOverscrollOffset by remember { mutableFloatStateOf(0f) }
+    val animatedOverscrollOffset by animateFloatAsState(
+        targetValue = bottomOverscrollOffset,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "AlbumSongListOverscroll"
+    )
+
     val preventUpwardSheetBounce = remember {
         object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (bottomOverscrollOffset < 0f && available.y > 0) {
+                    val newOffset = (bottomOverscrollOffset + available.y).coerceAtMost(0f)
+                    val consumedY = newOffset - bottomOverscrollOffset
+                    bottomOverscrollOffset = newOffset
+                    return Offset(0f, consumedY)
+                }
+                return Offset.Zero
+            }
+
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                return if (available.y < 0) {
-                    Offset(0f, available.y)
-                } else {
-                    Offset.Zero
+                if (available.y < 0) {
+                    bottomOverscrollOffset = (bottomOverscrollOffset + available.y * 0.25f).coerceAtLeast(-50f)
+                    return Offset(0f, available.y)
                 }
+                return Offset.Zero
             }
 
             override suspend fun onPostFling(
                 consumed: Velocity,
                 available: Velocity
             ): Velocity {
+                bottomOverscrollOffset = 0f
                 return if (available.y < 0) {
                     Velocity(0f, available.y)
                 } else {
@@ -615,7 +671,10 @@ internal fun AlbumSheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .nestedScroll(preventUpwardSheetBounce),
+                        .nestedScroll(preventUpwardSheetBounce)
+                        .graphicsLayer {
+                            translationY = animatedOverscrollOffset
+                        },
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     itemsIndexed(
