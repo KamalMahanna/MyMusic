@@ -121,8 +121,15 @@ fun SearchScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .focusRequester(focusRequester),
-            placeholder = { Text("Search...") },
-            singleLine = true
+            placeholder = { Text("Search songs, artists, albums...") },
+            singleLine = true,
+            shape = CircleShape,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                unfocusedBorderColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f)
+            )
         )
 
         if (uiState.query.isNotBlank() && !uiState.isLoading && uiState.error == null && availableCategories.isNotEmpty()) {

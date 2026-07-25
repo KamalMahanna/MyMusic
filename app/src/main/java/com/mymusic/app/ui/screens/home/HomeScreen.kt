@@ -4,6 +4,9 @@ package com.mymusic.app.ui.screens.home
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -110,8 +113,12 @@ fun HomeScreen(
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
                                             .size(cardSize)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                            .border(
+                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                                RoundedCornerShape(12.dp)
+                                            )
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(

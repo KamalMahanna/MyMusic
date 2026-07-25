@@ -8,6 +8,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -118,9 +121,9 @@ fun SongListItem(
 
     val animatedBgColor by animateColorAsState(
         targetValue = if (isPlaying)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         else
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         animationSpec = tween(durationMillis = 300),
         label = "SongItemBg"
     )
@@ -139,6 +142,7 @@ fun SongListItem(
             }
             .clip(itemShape)
             .background(animatedBgColor)
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), itemShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
