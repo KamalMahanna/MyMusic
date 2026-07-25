@@ -39,6 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.ui.text.style.TextOverflow
 
 import com.mymusic.app.ui.components.SongListItem
@@ -122,6 +125,22 @@ fun SearchScreen(
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .focusRequester(focusRequester),
             placeholder = { Text("Search songs, artists, albums...") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = "Search"
+                )
+            },
+            trailingIcon = {
+                if (uiState.query.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onQueryChange("") }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Clear search"
+                        )
+                    }
+                }
+            },
             singleLine = true,
             shape = CircleShape,
             colors = OutlinedTextFieldDefaults.colors(
