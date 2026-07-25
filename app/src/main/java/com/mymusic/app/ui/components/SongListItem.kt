@@ -78,19 +78,8 @@ fun SongListItem(
         label = "itemScale"
     )
 
-    val glassBorderBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.35f),
-            Color.White.copy(alpha = 0.08f)
-        )
-    )
-
-    val glassBgBrush = Brush.horizontalGradient(
-        colors = listOf(
-            Color(0x356366F1),
-            Color(0x20FFFFFF)
-        )
-    )
+    val glassBorderColor = Color.White.copy(alpha = 0.20f)
+    val glassBgColor = Color(0x35818CF8)
 
     val baseModifier = modifier
         .fillMaxWidth()
@@ -103,8 +92,8 @@ fun SongListItem(
     val itemModifier = if (isPlaying) {
         baseModifier
             .clip(CircleShape)
-            .background(glassBgBrush)
-            .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
+            .background(glassBgColor)
+            .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,

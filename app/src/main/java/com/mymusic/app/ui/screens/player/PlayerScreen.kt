@@ -1001,26 +1001,9 @@ private fun PlaybackControls(
         label = "NextScale"
     )
 
-    val glassBorderBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.40f),
-            Color.White.copy(alpha = 0.10f)
-        )
-    )
-
-    val buttonGlassBg = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.18f),
-            Color.White.copy(alpha = 0.06f)
-        )
-    )
-
-    val playGlassBg = Brush.linearGradient(
-        colors = listOf(
-            Color(0x70818CF8),
-            Color(0x40312E81)
-        )
-    )
+    val glassBorderColor = Color.White.copy(alpha = 0.20f)
+    val buttonGlassBg = Color.White.copy(alpha = 0.12f)
+    val playGlassBg = Color(0x55818CF8)
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -1037,7 +1020,7 @@ private fun PlaybackControls(
                 }
                 .clip(CircleShape)
                 .background(buttonGlassBg)
-                .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
+                .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
                 .clickable(
                     interactionSource = prevInteractionSource,
                     indication = LocalIndication.current,
@@ -1073,7 +1056,7 @@ private fun PlaybackControls(
                 )
                 .clip(CircleShape)
                 .background(playGlassBg)
-                .border(BorderStroke(1.5.dp, glassBorderBrush), CircleShape)
+                .border(BorderStroke(1.5.dp, glassBorderColor), CircleShape)
                 .clickable(
                     interactionSource = playInteractionSource,
                     indication = LocalIndication.current,
@@ -1109,7 +1092,7 @@ private fun PlaybackControls(
                 }
                 .clip(CircleShape)
                 .background(buttonGlassBg)
-                .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
+                .border(BorderStroke(1.dp, glassBorderColor), CircleShape)
                 .clickable(
                     interactionSource = nextInteractionSource,
                     indication = LocalIndication.current,
