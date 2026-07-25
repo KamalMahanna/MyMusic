@@ -408,6 +408,7 @@ fun PlayerScreen(
                                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                             amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
                                             wavelength = 40.dp,
+                                            waveSpeed = 16.dp,
                                             stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
                                             trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
                                         )
@@ -808,6 +809,7 @@ private fun TabletNowPlayingContent(
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
                     wavelength = 40.dp,
+                    waveSpeed = 16.dp,
                     stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
                     trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
                 )
