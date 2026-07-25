@@ -374,59 +374,30 @@ fun PlayerScreen(
                                 ) {
                                     Spacer(modifier = Modifier.weight(1f))
 
-                                    // Large Artwork Card with Floating 3D Depth Shadow & Ambient Glow
+                                    // Large Artwork Card with Floating Shadow & Glass Border
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .aspectRatio(1f),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        // Ambient Colored Depth Glow Shadow (Behind Artwork)
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize(0.96f)
-                                                .shadow(
-                                                    elevation = 40.dp,
-                                                    shape = RoundedCornerShape(28.dp),
-                                                    clip = false,
-                                                    spotColor = Color(0xFF818CF8).copy(alpha = 0.70f),
-                                                    ambientColor = Color(0xFFC084FC).copy(alpha = 0.50f)
-                                                )
-                                                .background(
-                                                    Brush.radialGradient(
-                                                        colors = listOf(
-                                                            Color(0x40818CF8),
-                                                            Color.Transparent
-                                                        )
-                                                    ),
-                                                    shape = RoundedCornerShape(28.dp)
-                                                )
-                                        )
-
-                                        // Main Floating Cover Artwork Card
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .shadow(
-                                                    elevation = 28.dp,
-                                                    shape = RoundedCornerShape(26.dp),
-                                                    clip = false,
-                                                    spotColor = Color.Black.copy(alpha = 0.85f),
-                                                    ambientColor = Color.Black.copy(alpha = 0.60f)
-                                                )
-                                                .clip(RoundedCornerShape(26.dp))
-                                                .border(
-                                                    BorderStroke(1.5.dp, Color.White.copy(alpha = 0.35f)),
-                                                    RoundedCornerShape(26.dp)
-                                                )
-                                        ) {
-                                            AsyncImage(
-                                                model = currentSong.highQualityImageUrl,
-                                                contentDescription = "Artwork",
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
+                                            .aspectRatio(1f)
+                                            .shadow(
+                                                elevation = 32.dp,
+                                                shape = RoundedCornerShape(24.dp),
+                                                clip = false,
+                                                spotColor = Color.Black.copy(alpha = 0.75f),
+                                                ambientColor = Color.Black.copy(alpha = 0.5f)
                                             )
-                                        }
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .border(
+                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                                                RoundedCornerShape(24.dp)
+                                            )
+                                    ) {
+                                        AsyncImage(
+                                            model = currentSong.highQualityImageUrl,
+                                            contentDescription = "Artwork",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
 
                                     Spacer(modifier = Modifier.weight(1f))
@@ -824,55 +795,26 @@ private fun TabletNowPlayingContent(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .aspectRatio(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            // Ambient Colored Depth Glow Shadow (Behind Artwork)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.96f)
-                    .shadow(
-                        elevation = 40.dp,
-                        shape = RoundedCornerShape(28.dp),
-                        clip = false,
-                        spotColor = Color(0xFF818CF8).copy(alpha = 0.70f),
-                        ambientColor = Color(0xFFC084FC).copy(alpha = 0.50f)
-                    )
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0x40818CF8),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    )
-            )
-
-            // Main Floating Cover Artwork Card
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .shadow(
-                        elevation = 28.dp,
-                        shape = RoundedCornerShape(26.dp),
-                        clip = false,
-                        spotColor = Color.Black.copy(alpha = 0.85f),
-                        ambientColor = Color.Black.copy(alpha = 0.60f)
-                    )
-                    .clip(RoundedCornerShape(26.dp))
-                    .border(
-                        BorderStroke(1.5.dp, Color.White.copy(alpha = 0.35f)),
-                        RoundedCornerShape(26.dp)
-                    )
-            ) {
-                AsyncImage(
-                    model = song.highQualityImageUrl,
-                    contentDescription = "Artwork",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                .aspectRatio(1f)
+                .shadow(
+                    elevation = 32.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    clip = false,
+                    spotColor = Color.Black.copy(alpha = 0.75f),
+                    ambientColor = Color.Black.copy(alpha = 0.5f)
                 )
-            }
+                .clip(RoundedCornerShape(24.dp))
+                .border(
+                    BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                    RoundedCornerShape(24.dp)
+                )
+        ) {
+            AsyncImage(
+                model = song.highQualityImageUrl,
+                contentDescription = "Artwork",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         Spacer(modifier = Modifier.weight(0.1f))
