@@ -17,6 +17,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.clickable
@@ -395,15 +396,20 @@ fun PlayerScreen(
                                     colors = sliderColors,
                                     interactionSource = interactionSource,
                                     track = { sliderState ->
+                                        val density = LocalDensity.current
+                                        val strokeWidthPx = with(density) { 6.dp.toPx() }
+                                        val trackStrokeWidthPx = with(density) { 3.dp.toPx() }
                                         LinearWavyProgressIndicator(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(16.dp),
+                                                .height(24.dp),
                                             color = MaterialTheme.colorScheme.primary,
                                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            amplitude = { 1.0f },
-                                            wavelength = 20.dp
+                                            amplitude = { if (playbackState.isPlaying) 1.0f else 0.0f },
+                                            wavelength = 40.dp,
+                                            stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
+                                            trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
                                         )
                                     },
                                     thumb = {
@@ -790,15 +796,20 @@ private fun TabletNowPlayingContent(
             colors = sliderColors,
             interactionSource = interactionSource,
             track = { sliderState ->
+                val density = LocalDensity.current
+                val strokeWidthPx = with(density) { 6.dp.toPx() }
+                val trackStrokeWidthPx = with(density) { 3.dp.toPx() }
                 LinearWavyProgressIndicator(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(16.dp),
+                        .height(24.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    amplitude = { 1.0f },
-                    wavelength = 20.dp
+                    amplitude = { if (playbackState.isPlaying) 1.0f else 0.0f },
+                    wavelength = 40.dp,
+                    stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
+                    trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
                 )
             },
             thumb = {
