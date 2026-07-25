@@ -12,6 +12,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
@@ -41,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -212,6 +216,36 @@ internal fun PlaylistSheetContent(
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
+    val preventUpwardSheetBounce = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // available.y < 0 is unconsumed upward scroll (swiping up at bottom of list).
+                // Consume it so ModalBottomSheet's drag handler does not get pushed upward,
+                // preventing infinite spring oscillation / rapid bouncing.
+                return if (available.y < 0) {
+                    Offset(0f, available.y)
+                } else {
+                    Offset.Zero
+                }
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                return if (available.y < 0) {
+                    Velocity(0f, available.y)
+                } else {
+                    Velocity.Zero
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -356,7 +390,8 @@ internal fun PlaylistSheetContent(
                     columns = GridCells.Fixed(if (isTablet) 2 else 1),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .nestedScroll(preventUpwardSheetBounce),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     itemsIndexed(
@@ -412,6 +447,33 @@ internal fun AlbumSheetContent(
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
     val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
+    val preventUpwardSheetBounce = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                return if (available.y < 0) {
+                    Offset(0f, available.y)
+                } else {
+                    Offset.Zero
+                }
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                return if (available.y < 0) {
+                    Velocity(0f, available.y)
+                } else {
+                    Velocity.Zero
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -552,7 +614,8 @@ internal fun AlbumSheetContent(
                     columns = GridCells.Fixed(if (isTablet) 2 else 1),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .nestedScroll(preventUpwardSheetBounce),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     itemsIndexed(
