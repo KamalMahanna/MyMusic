@@ -1032,32 +1032,21 @@ private fun PlaybackControls(
         }
 
         // Glassmorphic Play/Pause Button
-        Box(
+        IconButton(
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onPlayPauseClick()
+            },
             modifier = Modifier
                 .size(74.dp)
                 .graphicsLayer {
                     scaleX = playScale
                     scaleY = playScale
                 }
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    clip = false,
-                    spotColor = Color(0xFF818CF8).copy(alpha = 0.5f),
-                    ambientColor = Color.Black.copy(alpha = 0.4f)
-                )
                 .clip(CircleShape)
                 .background(playGlassBg)
-                .border(BorderStroke(1.5.dp, glassBorderColor), CircleShape)
-                .clickable(
-                    interactionSource = playInteractionSource,
-                    indication = LocalIndication.current,
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPlayPauseClick()
-                    }
-                ),
-            contentAlignment = Alignment.Center
+                .border(BorderStroke(1.5.dp, glassBorderColor), CircleShape),
+            interactionSource = playInteractionSource
         ) {
             if (isBuffering) {
                 CircularWavyProgressIndicator(
@@ -1069,7 +1058,7 @@ private fun PlaybackControls(
                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = "Play/Pause",
                     tint = Color.White,
-                    modifier = Modifier.size(42.dp)
+                    modifier = Modifier.size(40.dp)
                 )
             }
         }
