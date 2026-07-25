@@ -4,6 +4,10 @@ package com.mymusic.app.ui.screens.home
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
@@ -196,111 +200,154 @@ internal fun PlaylistSheetContent(
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.8f)
+            .fillMaxHeight(0.85f)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Blurred Playlist Image Background
+        playlist.highQualityImageUrl?.let { imageUrl ->
             AsyncImage(
-                model = playlist.mediumQualityImageUrl,
-                contentDescription = playlist.name,
+                model = imageUrl,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = 1.35f
+                        scaleY = 1.35f
+                    }
+                    .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                val subtitle = playlist.description ?: "${playlist.songCount ?: 0} Songs"
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
 
-        HorizontalDivider()
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val songs = playlist.songs
-        if (songs == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularWavyProgressIndicator()
-            }
-        } else if (songs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No songs found.")
-            }
-        } else {
-            val playingIndex = remember(songs, currentPlayingSongId) {
-                songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
-            }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (isTablet) 2 else 1),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                itemsIndexed(
-                    items = songs,
-                    key = { _, song -> song.id },
-                    contentType = { _, _ -> "song" }
-                ) { index, song ->
-                    val isDownloading = downloadStates[song.id]?.isDownloading == true
-                    val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
-                    val isPlaying = currentPlayingSongId == song.id
-                    
-                    val onClick = remember(songs, index) {
-                        {
-                            playerViewModel.playSongFromList(songs, index)
-                            onPlaySong()
-                        }
-                    }
-                    val onDownloadClick = remember(song) {
-                        { playerViewModel.downloadSong(song) }
-                    }
-
-                    SongListItem(
-                        song = song,
-                        onClick = onClick,
-                        onDownloadClick = onDownloadClick,
-                        isDownloaded = isDownloaded,
-                        isDownloading = isDownloading,
-                        isPlaying = isPlaying,
-                        downloadProgress = downloadStates[song.id]?.progress,
-                        index = index,
-                        totalCount = songs.size,
-                        playingIndex = playingIndex,
-                        modifier = Modifier.animateItem()
+        // Glassmorphism Dark Gradient Scrim Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.40f),
+                            Color.Black.copy(alpha = 0.65f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.90f)
+                        )
                     )
+                )
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(
+                            BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                            RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    AsyncImage(
+                        model = playlist.mediumQualityImageUrl,
+                        contentDescription = playlist.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = playlist.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val subtitle = playlist.description ?: "${playlist.songCount ?: 0} Songs"
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val songs = playlist.songs
+            if (songs == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularWavyProgressIndicator()
+                }
+            } else if (songs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No songs found.")
+                }
+            } else {
+                val playingIndex = remember(songs, currentPlayingSongId) {
+                    songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (isTablet) 2 else 1),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    itemsIndexed(
+                        items = songs,
+                        key = { _, song -> song.id },
+                        contentType = { _, _ -> "song" }
+                    ) { index, song ->
+                        val isDownloading = downloadStates[song.id]?.isDownloading == true
+                        val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
+                        val isPlaying = currentPlayingSongId == song.id
+                        
+                        val onClick = remember(songs, index) {
+                            {
+                                playerViewModel.playSongFromList(songs, index)
+                                onPlaySong()
+                            }
+                        }
+                        val onDownloadClick = remember(song) {
+                            { playerViewModel.downloadSong(song) }
+                        }
+
+                        SongListItem(
+                            song = song,
+                            onClick = onClick,
+                            onDownloadClick = onDownloadClick,
+                            isDownloaded = isDownloaded,
+                            isDownloading = isDownloading,
+                            isPlaying = isPlaying,
+                            downloadProgress = downloadStates[song.id]?.progress,
+                            index = index,
+                            totalCount = songs.size,
+                            playingIndex = playingIndex,
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
@@ -321,107 +368,150 @@ internal fun AlbumSheetContent(
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.8f)
+            .fillMaxHeight(0.85f)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Blurred Album Image Background
+        album.highQualityImageUrl?.let { imageUrl ->
             AsyncImage(
-                model = album.mediumQualityImageUrl,
-                contentDescription = album.name,
+                model = imageUrl,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = 1.35f
+                        scaleY = 1.35f
+                    }
+                    .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = album.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                val subtitle = album.description ?: "${album.songCount ?: 0} Songs"
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
 
-        HorizontalDivider()
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val songs = album.songs
-        if (songs == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularWavyProgressIndicator()
-            }
-        } else if (songs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No songs found.")
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (isTablet) 2 else 1),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                itemsIndexed(
-                    items = songs,
-                    key = { _, song -> song.id },
-                    contentType = { _, _ -> "song" }
-                ) { index, song ->
-                    val isDownloading = downloadStates[song.id]?.isDownloading == true
-                    val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
-                    val isPlaying = currentPlayingSongId == song.id
-                    
-                    val onClick = remember(songs, index) {
-                        {
-                            playerViewModel.playSongFromList(songs, index)
-                            onPlaySong()
-                        }
-                    }
-                    val onDownloadClick = remember(song) {
-                        { playerViewModel.downloadSong(song) }
-                    }
-
-                    SongListItem(
-                        song = song,
-                        onClick = onClick,
-                        onDownloadClick = onDownloadClick,
-                        isDownloaded = isDownloaded,
-                        isDownloading = isDownloading,
-                        isPlaying = isPlaying,
-                        downloadProgress = downloadStates[song.id]?.progress,
-                        index = index,
-                        totalCount = songs.size,
-                        modifier = Modifier.animateItem()
+        // Glassmorphism Dark Gradient Scrim Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.40f),
+                            Color.Black.copy(alpha = 0.65f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.90f)
+                        )
                     )
+                )
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(
+                            BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                            RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    AsyncImage(
+                        model = album.mediumQualityImageUrl,
+                        contentDescription = album.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = album.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val subtitle = album.description ?: "${album.songCount ?: 0} Songs"
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val songs = album.songs
+            if (songs == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularWavyProgressIndicator()
+                }
+            } else if (songs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No songs found.")
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (isTablet) 2 else 1),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    itemsIndexed(
+                        items = songs,
+                        key = { _, song -> song.id },
+                        contentType = { _, _ -> "song" }
+                    ) { index, song ->
+                        val isDownloading = downloadStates[song.id]?.isDownloading == true
+                        val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
+                        val isPlaying = currentPlayingSongId == song.id
+                        
+                        val onClick = remember(songs, index) {
+                            {
+                                playerViewModel.playSongFromList(songs, index)
+                                onPlaySong()
+                            }
+                        }
+                        val onDownloadClick = remember(song) {
+                            { playerViewModel.downloadSong(song) }
+                        }
+
+                        SongListItem(
+                            song = song,
+                            onClick = onClick,
+                            onDownloadClick = onDownloadClick,
+                            isDownloaded = isDownloaded,
+                            isDownloading = isDownloading,
+                            isPlaying = isPlaying,
+                            downloadProgress = downloadStates[song.id]?.progress,
+                            index = index,
+                            totalCount = songs.size,
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
