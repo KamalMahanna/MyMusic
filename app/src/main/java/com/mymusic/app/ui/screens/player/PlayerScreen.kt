@@ -999,7 +999,7 @@ private fun PlaybackControls(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(26.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Glassmorphic Previous Button
