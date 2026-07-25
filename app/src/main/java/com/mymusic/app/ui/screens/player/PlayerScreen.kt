@@ -398,7 +398,7 @@ fun PlayerScreen(
                                     track = { sliderState ->
                                         val density = LocalDensity.current
                                         val strokeWidthPx = with(density) { 6.dp.toPx() }
-                                        val trackStrokeWidthPx = with(density) { 3.dp.toPx() }
+                                        val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
                                         LinearWavyProgressIndicator(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
@@ -799,7 +799,7 @@ private fun TabletNowPlayingContent(
             track = { sliderState ->
                 val density = LocalDensity.current
                 val strokeWidthPx = with(density) { 6.dp.toPx() }
-                val trackStrokeWidthPx = with(density) { 3.dp.toPx() }
+                val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
                 LinearWavyProgressIndicator(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
