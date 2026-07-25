@@ -8,6 +8,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -75,13 +78,18 @@ fun SongListItem(
         label = "itemScale"
     )
 
-    val animatedBgColor by animateColorAsState(
-        targetValue = if (isPlaying)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-        else
-            Color.Transparent,
-        animationSpec = tween(durationMillis = 250),
-        label = "SongItemBg"
+    val glassBorderBrush = Brush.linearGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.35f),
+            Color.White.copy(alpha = 0.08f)
+        )
+    )
+
+    val glassBgBrush = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0x356366F1),
+            Color(0x20FFFFFF)
+        )
     )
 
     val baseModifier = modifier
@@ -95,7 +103,8 @@ fun SongListItem(
     val itemModifier = if (isPlaying) {
         baseModifier
             .clip(CircleShape)
-            .background(animatedBgColor)
+            .background(glassBgBrush)
+            .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
