@@ -399,9 +399,11 @@ fun PlayerScreen(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(10.dp),
+                                                .height(16.dp),
                                             color = MaterialTheme.colorScheme.primary,
-                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            amplitude = { 1.0f },
+                                            wavelength = 20.dp
                                         )
                                     },
                                     thumb = {
@@ -792,9 +794,11 @@ private fun TabletNowPlayingContent(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(10.dp),
+                        .height(16.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    amplitude = { 1.0f },
+                    wavelength = 20.dp
                 )
             },
             thumb = {
