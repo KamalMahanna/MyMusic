@@ -14,7 +14,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -32,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,8 +94,8 @@ fun PlayerScreen(
     val queue by viewModel.queue.collectAsState()
 
     val density = LocalDensity.current
-    var dragOffsetX by remember { mutableStateOf(0f) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
     val playerGestureModifier = if (!isTablet) {
         if (!showQueue) {
@@ -330,7 +331,7 @@ fun PlayerScreen(
                         )
                     } else {
                         // Main Player View
-                        var prevIndex by remember { mutableStateOf(currentIndex) }
+                        var prevIndex by remember { mutableIntStateOf(currentIndex) }
                         val isNext = currentIndex >= prevIndex
 
                         LaunchedEffect(currentIndex) {
@@ -569,7 +570,7 @@ fun QueueView(
         }
     }
 
-    var dragOffsetY by remember { mutableStateOf(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 30.dp.toPx() }
 
@@ -770,7 +771,7 @@ private fun TabletNowPlayingContent(
     viewModel: PlayerViewModel,
     onQueueClick: () -> Unit
 ) {
-    var prevIndex by remember { mutableStateOf(currentIndex) }
+    var prevIndex by remember { mutableIntStateOf(currentIndex) }
     val isNext = currentIndex >= prevIndex
 
     val isShuffleEnabled by viewModel.isShuffleEnabled.collectAsState()

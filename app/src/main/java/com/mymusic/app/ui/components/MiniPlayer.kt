@@ -49,8 +49,8 @@ fun MiniPlayer(
     val currentSong = song ?: return
     val haptics = LocalHapticFeedback.current
 
-    var totalDragX by remember { mutableStateOf(0f) }
-    var totalDragY by remember { mutableStateOf(0f) }
+    var totalDragX by remember { mutableFloatStateOf(0f) }
+    var totalDragY by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 80f
 
     Box(

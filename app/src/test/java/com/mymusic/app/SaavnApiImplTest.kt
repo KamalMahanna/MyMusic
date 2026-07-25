@@ -1,7 +1,6 @@
 package com.mymusic.app
 
 import com.mymusic.app.data.api.SaavnApiImpl
-import com.mymusic.app.data.model.Song
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.runBlocking

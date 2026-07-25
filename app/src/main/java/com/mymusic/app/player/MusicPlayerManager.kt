@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.annotation.OptIn
+import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -37,6 +39,7 @@ data class PlaybackState(
     val isBuffering: Boolean = false
 )
 
+@OptIn(androidx.media3.common.util.UnstableApi::class)
 @Singleton
 class MusicPlayerManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -238,7 +241,7 @@ class MusicPlayerManager @Inject constructor(
         } else {
             song.highQualityImageUrl?.let {
                 Log.d(TAG, "Using network artwork URL: $it")
-                android.net.Uri.parse(it)
+                it.toUri()
             }
         }
 
@@ -579,7 +582,7 @@ class MusicPlayerManager @Inject constructor(
         val artworkUri = if (localArtworkFile != null) {
             android.net.Uri.fromFile(localArtworkFile)
         } else {
-            song.highQualityImageUrl?.let { android.net.Uri.parse(it) }
+            song.highQualityImageUrl?.let { it.toUri() }
         }
 
         val metadata = MediaMetadata.Builder()
