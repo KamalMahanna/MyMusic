@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -153,7 +154,9 @@ fun HomeScreen(
         if (uiState.selectedPlaylist != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedPlaylist() },
-                sheetState = playlistSheetState
+                sheetState = playlistSheetState,
+                containerColor = Color.Transparent,
+                dragHandle = null
             ) {
                 PlaylistSheetContent(
                     playlist = uiState.selectedPlaylist!!,
@@ -169,7 +172,9 @@ fun HomeScreen(
         if (uiState.selectedAlbum != null) {
             ModalBottomSheet(
                 onDismissRequest = { viewModel.clearSelectedAlbum() },
-                sheetState = albumSheetState
+                sheetState = albumSheetState,
+                containerColor = Color.Transparent,
+                dragHandle = null
             ) {
                 AlbumSheetContent(
                     album = uiState.selectedAlbum!!,
@@ -199,11 +204,13 @@ internal fun PlaylistSheetContent(
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.85f)
+            .clip(sheetShape)
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Blurred Playlist Image Background
@@ -231,7 +238,7 @@ internal fun PlaylistSheetContent(
                         colors = listOf(
                             Color.Black.copy(alpha = 0.40f),
                             Color.Black.copy(alpha = 0.65f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.90f)
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
                         )
                     )
                 )
@@ -240,11 +247,22 @@ internal fun PlaylistSheetContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Drag Handle Pill
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.35f))
+                    .align(Alignment.CenterHorizontally)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 16.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -280,8 +298,6 @@ internal fun PlaylistSheetContent(
                     )
                 }
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -367,11 +383,13 @@ internal fun AlbumSheetContent(
     val currentPlayingSongId by playerViewModel.currentSongId.collectAsState(initial = null)
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val isTablet = LocalConfiguration.current.screenWidthDp >= 600
+    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.85f)
+            .clip(sheetShape)
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Blurred Album Image Background
@@ -399,7 +417,7 @@ internal fun AlbumSheetContent(
                         colors = listOf(
                             Color.Black.copy(alpha = 0.40f),
                             Color.Black.copy(alpha = 0.65f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.90f)
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
                         )
                     )
                 )
@@ -408,11 +426,22 @@ internal fun AlbumSheetContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Drag Handle Pill
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.35f))
+                    .align(Alignment.CenterHorizontally)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 16.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -448,8 +477,6 @@ internal fun AlbumSheetContent(
                     )
                 }
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
             Spacer(modifier = Modifier.height(8.dp))
 

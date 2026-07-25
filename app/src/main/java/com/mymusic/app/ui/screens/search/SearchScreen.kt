@@ -479,7 +479,9 @@ fun SearchScreen(
     if (uiState.selectedPlaylist != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.clearSelectedPlaylist() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            dragHandle = null
         ) {
             PlaylistSheetContent(
                 playlist = uiState.selectedPlaylist!!,
@@ -495,7 +497,9 @@ fun SearchScreen(
     if (uiState.selectedAlbum != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.clearSelectedAlbum() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            dragHandle = null
         ) {
             AlbumSheetContent(
                 album = uiState.selectedAlbum!!,
