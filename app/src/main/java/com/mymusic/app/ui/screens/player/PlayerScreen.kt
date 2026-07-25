@@ -64,6 +64,7 @@ import com.mymusic.app.ui.components.SongListItem
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -372,14 +373,21 @@ fun PlayerScreen(
                                 ) {
                                     Spacer(modifier = Modifier.weight(1f))
 
-                                    // Large Artwork Card with Glass Border
+                                    // Large Artwork Card with Floating Shadow & Glass Border
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .aspectRatio(1f)
+                                            .shadow(
+                                                elevation = 32.dp,
+                                                shape = RoundedCornerShape(24.dp),
+                                                clip = false,
+                                                spotColor = Color.Black.copy(alpha = 0.75f),
+                                                ambientColor = Color.Black.copy(alpha = 0.5f)
+                                            )
                                             .clip(RoundedCornerShape(24.dp))
                                             .border(
-                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
                                                 RoundedCornerShape(24.dp)
                                             )
                                     ) {
@@ -787,9 +795,16 @@ private fun TabletNowPlayingContent(
             modifier = Modifier
                 .weight(1f)
                 .aspectRatio(1f)
+                .shadow(
+                    elevation = 32.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    clip = false,
+                    spotColor = Color.Black.copy(alpha = 0.75f),
+                    ambientColor = Color.Black.copy(alpha = 0.5f)
+                )
                 .clip(RoundedCornerShape(24.dp))
                 .border(
-                    BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                    BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
                     RoundedCornerShape(24.dp)
                 )
         ) {
