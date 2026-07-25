@@ -14,7 +14,9 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.clickable
@@ -392,16 +394,26 @@ fun PlayerScreen(
                                     },
                                     colors = sliderColors,
                                     interactionSource = interactionSource,
+                                    track = { sliderState ->
+                                        LinearProgressIndicator(
+                                            progress = { sliderState.coercedValueAsFraction },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(12.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
+                                    },
                                     thumb = {
                                         val isPressed by interactionSource.collectIsPressedAsState()
                                         val isDragged by interactionSource.collectIsDraggedAsState()
                                         val showTooltip = isPressed || isDragged
 
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.wrapContentSize(unbounded = true)
-                                        ) {
-                                            if (showTooltip) {
+                                        if (showTooltip) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.wrapContentSize(unbounded = true)
+                                            ) {
                                                 Box(
                                                     modifier = Modifier
                                                         .layout { measurable, constraints ->
@@ -430,12 +442,6 @@ fun PlayerScreen(
                                                     )
                                                 }
                                             }
-
-                                            SliderDefaults.Thumb(
-                                                interactionSource = interactionSource,
-                                                colors = sliderColors,
-                                                enabled = true
-                                            )
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth()
@@ -781,16 +787,26 @@ private fun TabletNowPlayingContent(
             },
             colors = sliderColors,
             interactionSource = interactionSource,
+            track = { sliderState ->
+                LinearProgressIndicator(
+                    progress = { sliderState.coercedValueAsFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            },
             thumb = {
                 val isPressed by interactionSource.collectIsPressedAsState()
                 val isDragged by interactionSource.collectIsDraggedAsState()
                 val showTooltip = isPressed || isDragged
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.wrapContentSize(unbounded = true)
-                ) {
-                    if (showTooltip) {
+                if (showTooltip) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.wrapContentSize(unbounded = true)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .layout { measurable, constraints ->
@@ -819,12 +835,6 @@ private fun TabletNowPlayingContent(
                             )
                         }
                     }
-
-                    SliderDefaults.Thumb(
-                        interactionSource = interactionSource,
-                        colors = sliderColors,
-                        enabled = true
-                    )
                 }
             },
             modifier = Modifier.fillMaxWidth()
