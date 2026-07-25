@@ -56,6 +56,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.shape.CircleShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -1000,88 +1001,130 @@ private fun PlaybackControls(
         label = "NextScale"
     )
 
+    val glassBorderBrush = Brush.linearGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.40f),
+            Color.White.copy(alpha = 0.10f)
+        )
+    )
+
+    val buttonGlassBg = Brush.linearGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.18f),
+            Color.White.copy(alpha = 0.06f)
+        )
+    )
+
+    val playGlassBg = Brush.linearGradient(
+        colors = listOf(
+            Color(0x70818CF8),
+            Color(0x40312E81)
+        )
+    )
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(26.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FilledTonalIconButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onPreviousClick()
-            },
+        // Glassmorphic Previous Button
+        Box(
             modifier = Modifier
-                .size(width = 56.dp, height = 44.dp)
+                .size(width = 58.dp, height = 46.dp)
                 .graphicsLayer {
                     scaleX = prevScale
                     scaleY = prevScale
-                },
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            interactionSource = prevInteractionSource
+                }
+                .clip(CircleShape)
+                .background(buttonGlassBg)
+                .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
+                .clickable(
+                    interactionSource = prevInteractionSource,
+                    indication = LocalIndication.current,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPreviousClick()
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.SkipPrevious,
                 contentDescription = "Previous",
-                modifier = Modifier.size(24.dp)
+                tint = Color.White,
+                modifier = Modifier.size(26.dp)
             )
         }
 
-        FloatingActionButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onPlayPauseClick()
-            },
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            interactionSource = playInteractionSource,
+        // Glassmorphic Play/Pause Button
+        Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(74.dp)
                 .graphicsLayer {
                     scaleX = playScale
                     scaleY = playScale
                 }
+                .shadow(
+                    elevation = 16.dp,
+                    shape = CircleShape,
+                    clip = false,
+                    spotColor = Color(0xFF818CF8).copy(alpha = 0.5f),
+                    ambientColor = Color.Black.copy(alpha = 0.4f)
+                )
+                .clip(CircleShape)
+                .background(playGlassBg)
+                .border(BorderStroke(1.5.dp, glassBorderBrush), CircleShape)
+                .clickable(
+                    interactionSource = playInteractionSource,
+                    indication = LocalIndication.current,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPlayPauseClick()
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
             if (isBuffering) {
                 CircularWavyProgressIndicator(
                     modifier = Modifier.size(36.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = Color.White
                 )
             } else {
                 Icon(
                     imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = "Play/Pause",
-                    modifier = Modifier.size(40.dp)
+                    tint = Color.White,
+                    modifier = Modifier.size(42.dp)
                 )
             }
         }
 
-        FilledTonalIconButton(
-            onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onNextClick()
-            },
+        // Glassmorphic Next Button
+        Box(
             modifier = Modifier
-                .size(width = 56.dp, height = 44.dp)
+                .size(width = 58.dp, height = 46.dp)
                 .graphicsLayer {
                     scaleX = nextScale
                     scaleY = nextScale
-                },
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            interactionSource = nextInteractionSource
+                }
+                .clip(CircleShape)
+                .background(buttonGlassBg)
+                .border(BorderStroke(1.dp, glassBorderBrush), CircleShape)
+                .clickable(
+                    interactionSource = nextInteractionSource,
+                    indication = LocalIndication.current,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onNextClick()
+                    }
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Rounded.SkipNext,
                 contentDescription = "Next",
-                modifier = Modifier.size(24.dp)
+                tint = Color.White,
+                modifier = Modifier.size(26.dp)
             )
         }
     }
