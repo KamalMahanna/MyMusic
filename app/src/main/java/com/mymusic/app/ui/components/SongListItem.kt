@@ -8,8 +8,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,52 +40,10 @@ fun groupedSongItemShape(
     totalCount: Int,
     playingIndex: Int? = null
 ): RoundedCornerShape {
-    if (playingIndex != null && playingIndex in 0 until totalCount) {
-        return when {
-            index == playingIndex -> RoundedCornerShape(percent = 50)
-            index == playingIndex - 1 -> RoundedCornerShape(
-                topStart = if (index == 0) 20.dp else 4.dp,
-                topEnd = if (index == 0) 20.dp else 4.dp,
-                bottomStart = 20.dp,
-                bottomEnd = 20.dp
-            )
-            index == playingIndex + 1 -> RoundedCornerShape(
-                topStart = 20.dp,
-                topEnd = 20.dp,
-                bottomStart = if (index == totalCount - 1) 20.dp else 4.dp,
-                bottomEnd = if (index == totalCount - 1) 20.dp else 4.dp
-            )
-            index == 0 -> RoundedCornerShape(
-                topStart = 20.dp,
-                topEnd = 20.dp,
-                bottomStart = 4.dp,
-                bottomEnd = 4.dp
-            )
-            index == totalCount - 1 -> RoundedCornerShape(
-                topStart = 4.dp,
-                topEnd = 4.dp,
-                bottomStart = 20.dp,
-                bottomEnd = 20.dp
-            )
-            else -> RoundedCornerShape(4.dp)
-        }
-    }
-
-    return when {
-        totalCount <= 1 -> RoundedCornerShape(20.dp)
-        index == 0 -> RoundedCornerShape(
-            topStart = 20.dp,
-            topEnd = 20.dp,
-            bottomStart = 4.dp,
-            bottomEnd = 4.dp
-        )
-        index == totalCount - 1 -> RoundedCornerShape(
-            topStart = 4.dp,
-            topEnd = 4.dp,
-            bottomStart = 20.dp,
-            bottomEnd = 20.dp
-        )
-        else -> RoundedCornerShape(4.dp)
+    return if (playingIndex != null && index == playingIndex) {
+        RoundedCornerShape(percent = 50)
+    } else {
+        RoundedCornerShape(12.dp)
     }
 }
 
@@ -121,28 +77,25 @@ fun SongListItem(
 
     val animatedBgColor by animateColorAsState(
         targetValue = if (isPlaying)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
         else
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        animationSpec = tween(durationMillis = 300),
+            Color.Transparent,
+        animationSpec = tween(durationMillis = 250),
         label = "SongItemBg"
     )
 
-    val itemShape = remember(index, totalCount, playingIndex) {
-        groupedSongItemShape(index, totalCount, playingIndex)
-    }
+    val baseModifier = modifier
+        .fillMaxWidth()
+        .padding(horizontal = 4.dp, vertical = 2.dp)
+        .graphicsLayer {
+            scaleX = itemScale
+            scaleY = itemScale
+        }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .graphicsLayer {
-                scaleX = itemScale
-                scaleY = itemScale
-            }
-            .clip(itemShape)
+    val itemModifier = if (isPlaying) {
+        baseModifier
+            .clip(CircleShape)
             .background(animatedBgColor)
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), itemShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
@@ -151,7 +104,22 @@ fun SongListItem(
                     onClick()
                 }
             )
-            .padding(8.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    } else {
+        baseModifier
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    }
+
+    Row(
+        modifier = itemModifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
@@ -159,11 +127,11 @@ fun SongListItem(
             contentDescription = "Song Artwork",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(56.dp)
+                .size(48.dp)
                 .clip(CircleShape)
         )
         
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
         
         Column(
             modifier = Modifier.weight(1f)
@@ -171,16 +139,16 @@ fun SongListItem(
             Text(
                 text = song.name,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.SemiBold,
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = song.primaryArtistNames,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isPlaying) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -195,16 +163,16 @@ fun SongListItem(
                 imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                 contentDescription = "Playing",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(10.dp)
             )
         } else if (isDownloading) {
             Box(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(44.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularWavyProgressIndicator(
                     progress = { downloadProgress ?: 0f },
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
         } else {
@@ -215,7 +183,7 @@ fun SongListItem(
                 Icon(
                     imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                     contentDescription = "Download",
-                    tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }

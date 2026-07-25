@@ -61,7 +61,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.ui.components.SongListItem
-import com.mymusic.app.ui.components.groupedSongItemShape
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.draw.blur
@@ -709,13 +708,11 @@ fun QueueView(
                         }
                     )
 
-                    val itemShape = remember(index, queue.size, currentIndex) {
-                        groupedSongItemShape(index, queue.size, currentIndex)
-                    }
-
                     val isDownloading = downloadStates[song.id]?.isDownloading == true
                     val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { viewModel.isSongDownloaded(song) }
                     val isPlaying = index == currentIndex
+
+                    val itemShape = if (isPlaying) CircleShape else RoundedCornerShape(12.dp)
 
                     SwipeToDismissBox(
                         state = dismissState,
@@ -724,12 +721,12 @@ fun QueueView(
                         backgroundContent = {
                             val color = when (dismissState.targetValue) {
                                 SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
-                                else -> MaterialTheme.colorScheme.surface
+                                else -> Color.Transparent
                             }
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
                                     .clip(itemShape)
                                     .background(color)
                                     .padding(horizontal = 20.dp),
