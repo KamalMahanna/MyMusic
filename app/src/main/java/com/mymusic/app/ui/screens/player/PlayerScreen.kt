@@ -399,7 +399,7 @@ fun PlayerScreen(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(12.dp),
+                                                .height(8.dp),
                                             color = MaterialTheme.colorScheme.primary,
                                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
@@ -792,7 +792,7 @@ private fun TabletNowPlayingContent(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(12.dp),
+                        .height(8.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
