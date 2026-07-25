@@ -27,6 +27,7 @@ import com.mymusic.app.ui.components.SongListItem
 
 @Composable
 fun LibraryScreen(
+    isPlayerExpanded: Boolean = false,
     onPlaySong: () -> Unit,
     bottomPadding: Dp,
     viewModel: LibraryViewModel = hiltViewModel(),
@@ -42,6 +43,13 @@ fun LibraryScreen(
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(isPlayerExpanded) {
+        if (isPlayerExpanded) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
 
     if (songs.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -167,6 +175,8 @@ fun LibraryScreen(
                 SongListItem(
                     song = song,
                     onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
                         val originalIndex = songList.indexOfFirst { it.id == song.id }
                         playerViewModel.playSongFromList(songList, if (originalIndex != -1) originalIndex else index)
                         onPlaySong()

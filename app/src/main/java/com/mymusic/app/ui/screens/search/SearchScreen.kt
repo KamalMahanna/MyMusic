@@ -214,6 +214,8 @@ fun SearchScreen(
                         
                         val onClick = remember(song) {
                             {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
                                 playerViewModel.playSongWithRecommendations(song)
                                 onPlaySong()
                             }
@@ -458,6 +460,8 @@ fun SearchScreen(
                             
                             val onClick = remember(topSongs, index) {
                                 {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
                                     playerViewModel.playSongFromList(topSongs, index)
                                     viewModel.clearSelectedArtist()
                                     onPlaySong()

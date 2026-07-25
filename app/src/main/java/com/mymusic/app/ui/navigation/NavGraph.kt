@@ -197,6 +197,7 @@ fun MyMusicNavGraph(
                     }
                     composable(Screen.Library.route) {
                         LibraryScreen(
+                            isPlayerExpanded = isPlayerExpanded,
                             onPlaySong = { isPlayerExpanded = true },
                             bottomPadding = screenBottomPadding
                         )
