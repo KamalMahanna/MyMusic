@@ -172,6 +172,10 @@ class MusicPlayerManager @Inject constructor(
 
     fun playSong(song: Song) {
         Log.d(TAG, "playSong: songId='${song.id}', name='${song.name}', artist='${song.primaryArtistNames}'")
+        if (queueManager.currentSong?.id != song.id) {
+            Log.d(TAG, "playSong: queueManager current song mismatch (queue='${queueManager.currentSong?.name}' vs target='${song.name}'). Syncing queue to target song.")
+            queueManager.setQueue(listOf(song), 0)
+        }
         val player = getOrCreatePlayer()
         
         try {

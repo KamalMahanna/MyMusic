@@ -72,7 +72,7 @@ class HomeViewModel @Inject constructor(
 
                         val result = musicRepository.getSongById(item.id)
                         result.onSuccess { song ->
-                            musicPlayerManager.playSong(song)
+                            musicPlayerManager.playSongWithRecommendations(song)
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load song", e)
                             _uiState.value = _uiState.value.copy(error = "Failed to load song: ${e.message}")
