@@ -111,7 +111,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun isSongDownloaded(song: Song): Boolean {
-        return downloadRepository.isSongDownloaded(song)
+        return downloadRepository.isSongDownloaded(song) || (songDownloader.downloadStates.value[song.id]?.isComplete == true)
     }
 
     fun playQueueIndex(index: Int) {

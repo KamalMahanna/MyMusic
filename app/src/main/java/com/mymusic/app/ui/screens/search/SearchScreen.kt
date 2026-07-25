@@ -186,7 +186,7 @@ fun SearchScreen(
                             uiState.songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
                         }
                         val isDownloading = downloadStates[song.id]?.isDownloading == true
-                        val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                        val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
                         val isPlaying = currentPlayingSongId == song.id
                         
                         val onClick = remember(song) {
@@ -436,7 +436,7 @@ fun SearchScreen(
                             key = { _, song -> song.id }
                         ) { index, song ->
                             val isDownloading = downloadStates[song.id]?.isDownloading == true
-                            val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                            val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
                             val isPlaying = currentPlayingSongId == song.id
                             
                             val onClick = remember(topSongs, index) {

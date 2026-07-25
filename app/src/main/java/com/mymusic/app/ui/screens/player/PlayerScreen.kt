@@ -651,7 +651,7 @@ fun QueueView(
                     }
 
                     val isDownloading = downloadStates[song.id]?.isDownloading == true
-                    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
+                    val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { viewModel.isSongDownloaded(song) }
                     val isPlaying = index == currentIndex
 
                     SwipeToDismissBox(
@@ -1009,7 +1009,7 @@ private fun BottomControlsRow(
     val downloadStates by viewModel.downloadStates.collectAsState()
     val state = downloadStates[song.id]
     val isDownloading = state?.isDownloading == true
-    val isDownloaded = remember(downloadedSongs, song.id) { viewModel.isSongDownloaded(song) }
+    val isDownloaded = remember(downloadedSongs, state?.isComplete, song.id) { viewModel.isSongDownloaded(song) }
 
     val downloadInteractionSource = remember { MutableInteractionSource() }
     val isDownloadPressed by downloadInteractionSource.collectIsPressedAsState()

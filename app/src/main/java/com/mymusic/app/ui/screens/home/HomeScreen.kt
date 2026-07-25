@@ -268,7 +268,7 @@ internal fun PlaylistSheetContent(
                     contentType = { _, _ -> "song" }
                 ) { index, song ->
                     val isDownloading = downloadStates[song.id]?.isDownloading == true
-                    val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                    val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
                     
                     val onClick = remember(songs, index) {
@@ -390,7 +390,7 @@ internal fun AlbumSheetContent(
                     contentType = { _, _ -> "song" }
                 ) { index, song ->
                     val isDownloading = downloadStates[song.id]?.isDownloading == true
-                    val isDownloaded = remember(downloadedSongs, song.id) { playerViewModel.isSongDownloaded(song) }
+                    val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
                     val isPlaying = currentPlayingSongId == song.id
                     
                     val onClick = remember(songs, index) {

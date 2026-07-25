@@ -27,6 +27,7 @@ fun SongDownloadIndicator(
     val downloadStates by playerViewModel.downloadStates.collectAsState()
     val state = downloadStates[songId]
     val isDownloading = state?.isDownloading == true
+    val effectiveIsDownloaded = isDownloaded || (state?.isComplete == true)
 
     if (isDownloading) {
         Box(
@@ -44,9 +45,9 @@ fun SongDownloadIndicator(
             modifier = modifier
         ) {
             Icon(
-                imageVector = if (isDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
+                imageVector = if (effectiveIsDownloaded) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                 contentDescription = "Download",
-                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                tint = if (effectiveIsDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )
         }
     }
