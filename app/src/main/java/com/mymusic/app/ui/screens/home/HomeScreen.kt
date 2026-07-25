@@ -6,6 +6,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.BorderStroke
@@ -156,6 +160,7 @@ fun HomeScreen(
                 onDismissRequest = { viewModel.clearSelectedPlaylist() },
                 sheetState = playlistSheetState,
                 containerColor = Color.Transparent,
+                scrimColor = Color.Black.copy(alpha = 0.6f),
                 dragHandle = null
             ) {
                 PlaylistSheetContent(
@@ -174,6 +179,7 @@ fun HomeScreen(
                 onDismissRequest = { viewModel.clearSelectedAlbum() },
                 sheetState = albumSheetState,
                 containerColor = Color.Transparent,
+                scrimColor = Color.Black.copy(alpha = 0.6f),
                 dragHandle = null
             ) {
                 AlbumSheetContent(
@@ -210,40 +216,62 @@ internal fun PlaylistSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.85f)
-            .clip(sheetShape)
-            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Blurred Playlist Image Background
-        playlist.highQualityImageUrl?.let { imageUrl ->
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        // Extended Background Container: Blurred Image + Glassmorphism Scrim Gradient
+        // Measures 1000dp taller than the sheet layout so that the blurred artwork and gradient overlay
+        // extend seamlessly past the bottom edge when the sheet is stretched or bounced during fast scrolling.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .layout { measurable, constraints ->
+                    val extraHeight = 1000.dp.roundToPx()
+                    val placeable = measurable.measure(
+                        constraints.copy(
+                            minHeight = constraints.maxHeight + extraHeight,
+                            maxHeight = constraints.maxHeight + extraHeight
+                        )
+                    )
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        placeable.place(0, 0)
+                    }
+                }
+                .clip(sheetShape)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Blurred Playlist Image Background
+            playlist.highQualityImageUrl?.let { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = 1.35f
+                            scaleY = 1.35f
+                        }
+                        .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                )
+            }
+
+            // Glassmorphism Dark Gradient Scrim Overlay
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.35f
-                        scaleY = 1.35f
-                    }
-                    .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.40f),
+                                Color.Black.copy(alpha = 0.65f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
+                            )
+                        )
+                    )
             )
         }
 
-        // Glassmorphism Dark Gradient Scrim Overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.40f),
-                            Color.Black.copy(alpha = 0.65f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
-                        )
-                    )
-                )
-        )
-
+        // Foreground Content
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -389,40 +417,60 @@ internal fun AlbumSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.85f)
-            .clip(sheetShape)
-            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Blurred Album Image Background
-        album.highQualityImageUrl?.let { imageUrl ->
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        // Extended Background Container: Blurred Image + Glassmorphism Scrim Gradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .layout { measurable, constraints ->
+                    val extraHeight = 1000.dp.roundToPx()
+                    val placeable = measurable.measure(
+                        constraints.copy(
+                            minHeight = constraints.maxHeight + extraHeight,
+                            maxHeight = constraints.maxHeight + extraHeight
+                        )
+                    )
+                    layout(constraints.maxWidth, constraints.maxHeight) {
+                        placeable.place(0, 0)
+                    }
+                }
+                .clip(sheetShape)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Blurred Album Image Background
+            album.highQualityImageUrl?.let { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = 1.35f
+                            scaleY = 1.35f
+                        }
+                        .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                )
+            }
+
+            // Glassmorphism Dark Gradient Scrim Overlay
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.35f
-                        scaleY = 1.35f
-                    }
-                    .blur(radius = 70.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.40f),
+                                Color.Black.copy(alpha = 0.65f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
+                            )
+                        )
+                    )
             )
         }
 
-        // Glassmorphism Dark Gradient Scrim Overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.40f),
-                            Color.Black.copy(alpha = 0.65f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f)
-                        )
-                    )
-                )
-        )
-
+        // Foreground Content
         Column(
             modifier = Modifier.fillMaxSize()
         ) {

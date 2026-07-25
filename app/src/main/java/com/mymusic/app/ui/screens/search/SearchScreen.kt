@@ -481,6 +481,7 @@ fun SearchScreen(
             onDismissRequest = { viewModel.clearSelectedPlaylist() },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f),
             dragHandle = null
         ) {
             PlaylistSheetContent(
@@ -499,6 +500,7 @@ fun SearchScreen(
             onDismissRequest = { viewModel.clearSelectedAlbum() },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f),
             dragHandle = null
         ) {
             AlbumSheetContent(
