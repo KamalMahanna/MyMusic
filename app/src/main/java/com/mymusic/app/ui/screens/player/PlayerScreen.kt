@@ -425,7 +425,7 @@ fun PlayerScreen(
                                                                 )
                                                             }
                                                         }
-                                                        .offset(y = (-36).dp)
+                                                        .offset(y = (-20).dp)
                                                         .background(
                                                             color = MaterialTheme.colorScheme.primary,
                                                             shape = RoundedCornerShape(8.dp)
@@ -818,7 +818,7 @@ private fun TabletNowPlayingContent(
                                         )
                                     }
                                 }
-                                .offset(y = (-36).dp)
+                                .offset(y = (-20).dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,
                                     shape = RoundedCornerShape(8.dp)
