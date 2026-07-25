@@ -441,78 +441,65 @@ fun PlayerScreen(
                                         thumbColor = MaterialTheme.colorScheme.primary
                                     )
 
-                                    Slider(
-                                        value = sliderPosition ?: progress,
-                                        onValueChange = { sliderPosition = it },
-                                        onValueChangeFinished = {
-                                            sliderPosition?.let { pos ->
-                                                viewModel.seekTo((pos * playbackState.duration).toLong())
-                                            }
-                                            sliderPosition = null
-                                        },
-                                        colors = sliderColors,
-                                        interactionSource = interactionSource,
-                                        track = { sliderState ->
-                                            val density = LocalDensity.current
-                                            val strokeWidthPx = with(density) { 6.dp.toPx() }
-                                            val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
-                                            LinearWavyProgressIndicator(
-                                                progress = { sliderState.coercedValueAsFraction },
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(18.dp),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                                amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
-                                                wavelength = 40.dp,
-                                                waveSpeed = 16.dp,
-                                                stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
-                                                trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
-                                            )
-                                        },
-                                        thumb = {
-                                            val isPressed by interactionSource.collectIsPressedAsState()
-                                            val isDragged by interactionSource.collectIsDraggedAsState()
-                                            val showTooltip = isPressed || isDragged
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Current position time
+                                        val displayPositionMillis = if (sliderPosition != null) {
+                                            (sliderPosition!! * playbackState.duration).toLong()
+                                        } else {
+                                            playbackState.currentPosition
+                                        }
+                                        Text(
+                                            text = formatMillis(displayPositionMillis),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Medium
+                                        )
 
-                                            if (showTooltip) {
-                                                Box(
-                                                    contentAlignment = Alignment.Center,
-                                                    modifier = Modifier.wrapContentSize(unbounded = true)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .layout { measurable, constraints ->
-                                                                val placeable = measurable.measure(constraints)
-                                                                layout(0, 0) {
-                                                                    placeable.place(
-                                                                        x = -placeable.width / 2,
-                                                                        y = -placeable.height / 2
-                                                                    )
-                                                                }
-                                                            }
-                                                            .offset(y = (-20).dp)
-                                                            .background(
-                                                                color = MaterialTheme.colorScheme.primary,
-                                                                shape = RoundedCornerShape(8.dp)
-                                                            )
-                                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        val currentPositionMillis = ((sliderPosition ?: progress) * playbackState.duration).toLong()
-                                                        Text(
-                                                            text = formatMillis(currentPositionMillis),
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onPrimary,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
+                                        Slider(
+                                            value = sliderPosition ?: progress,
+                                            onValueChange = { sliderPosition = it },
+                                            onValueChangeFinished = {
+                                                sliderPosition?.let { pos ->
+                                                    viewModel.seekTo((pos * playbackState.duration).toLong())
                                                 }
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                                sliderPosition = null
+                                            },
+                                            colors = sliderColors,
+                                            interactionSource = interactionSource,
+                                            track = { sliderState ->
+                                                val density = LocalDensity.current
+                                                val strokeWidthPx = with(density) { 6.dp.toPx() }
+                                                val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
+                                                LinearWavyProgressIndicator(
+                                                    progress = { sliderState.coercedValueAsFraction },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(18.dp),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                                    amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
+                                                    wavelength = 40.dp,
+                                                    waveSpeed = 16.dp,
+                                                    stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
+                                                    trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
+                                                )
+                                            },
+                                            thumb = {},
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        // Total duration time
+                                        Text(
+                                            text = formatMillis(playbackState.duration),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
 
@@ -852,78 +839,65 @@ private fun TabletNowPlayingContent(
             thumbColor = MaterialTheme.colorScheme.primary
         )
 
-        Slider(
-            value = sliderPosition ?: progress,
-            onValueChange = { sliderPosition = it },
-            onValueChangeFinished = {
-                sliderPosition?.let { pos ->
-                    viewModel.seekTo((pos * playbackState.duration).toLong())
-                }
-                sliderPosition = null
-            },
-            colors = sliderColors,
-            interactionSource = interactionSource,
-            track = { sliderState ->
-                val density = LocalDensity.current
-                val strokeWidthPx = with(density) { 6.dp.toPx() }
-                val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
-                LinearWavyProgressIndicator(
-                    progress = { sliderState.coercedValueAsFraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(18.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
-                    wavelength = 40.dp,
-                    waveSpeed = 16.dp,
-                    stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
-                    trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
-                )
-            },
-            thumb = {
-                val isPressed by interactionSource.collectIsPressedAsState()
-                val isDragged by interactionSource.collectIsDraggedAsState()
-                val showTooltip = isPressed || isDragged
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Current position time
+            val displayPositionMillis = if (sliderPosition != null) {
+                (sliderPosition!! * playbackState.duration).toLong()
+            } else {
+                playbackState.currentPosition
+            }
+            Text(
+                text = formatMillis(displayPositionMillis),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
 
-                if (showTooltip) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.wrapContentSize(unbounded = true)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .layout { measurable, constraints ->
-                                    val placeable = measurable.measure(constraints)
-                                    layout(0, 0) {
-                                        placeable.place(
-                                            x = -placeable.width / 2,
-                                            y = -placeable.height / 2
-                                        )
-                                    }
-                                }
-                                .offset(y = (-20).dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val currentPositionMillis = ((sliderPosition ?: progress) * playbackState.duration).toLong()
-                            Text(
-                                text = formatMillis(currentPositionMillis),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+            Slider(
+                value = sliderPosition ?: progress,
+                onValueChange = { sliderPosition = it },
+                onValueChangeFinished = {
+                    sliderPosition?.let { pos ->
+                        viewModel.seekTo((pos * playbackState.duration).toLong())
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(4.dp))
+                    sliderPosition = null
+                },
+                colors = sliderColors,
+                interactionSource = interactionSource,
+                track = { sliderState ->
+                    val density = LocalDensity.current
+                    val strokeWidthPx = with(density) { 6.dp.toPx() }
+                    val trackStrokeWidthPx = with(density) { 6.dp.toPx() }
+                    LinearWavyProgressIndicator(
+                        progress = { sliderState.coercedValueAsFraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(18.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        amplitude = { if (playbackState.isPlaying) 0.6f else 0.0f },
+                        wavelength = 40.dp,
+                        waveSpeed = 16.dp,
+                        stroke = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
+                        trackStroke = Stroke(width = trackStrokeWidthPx, cap = StrokeCap.Round)
+                    )
+                },
+                thumb = {},
+                modifier = Modifier.weight(1f)
+            )
+
+            // Total duration time
+            Text(
+                text = formatMillis(playbackState.duration),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
