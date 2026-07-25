@@ -374,7 +374,7 @@ fun PlayerScreen(
                                 ) {
                                     Spacer(modifier = Modifier.weight(1f))
 
-                                    // Large Artwork Card with Floating Shadow & Glass Border
+                                    // Large Artwork Card with Floating Shadow
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -387,10 +387,6 @@ fun PlayerScreen(
                                                 ambientColor = Color.Black.copy(alpha = 0.5f)
                                             )
                                             .clip(RoundedCornerShape(24.dp))
-                                            .border(
-                                                BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                                                RoundedCornerShape(24.dp)
-                                            )
                                     ) {
                                         AsyncImage(
                                             model = currentSong.highQualityImageUrl,
@@ -804,10 +800,6 @@ private fun TabletNowPlayingContent(
                     ambientColor = Color.Black.copy(alpha = 0.5f)
                 )
                 .clip(RoundedCornerShape(24.dp))
-                .border(
-                    BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                    RoundedCornerShape(24.dp)
-                )
         ) {
             AsyncImage(
                 model = song.highQualityImageUrl,
