@@ -6,10 +6,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -412,9 +410,6 @@ internal fun PlaylistSheetContent(
                     Text("No songs found.")
                 }
             } else {
-                val playingIndex = remember(songs, currentPlayingSongId) {
-                    songs.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
-                }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(if (isTablet) 2 else 1),
                     modifier = Modifier
@@ -453,9 +448,6 @@ internal fun PlaylistSheetContent(
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
                             downloadProgress = downloadStates[song.id]?.progress,
-                            index = index,
-                            totalCount = songs.size,
-                            playingIndex = playingIndex,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -704,8 +696,6 @@ internal fun AlbumSheetContent(
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
                             downloadProgress = downloadStates[song.id]?.progress,
-                            index = index,
-                            totalCount = songs.size,
                             modifier = Modifier.animateItem()
                         )
                     }

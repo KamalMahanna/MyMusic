@@ -1,3 +1,5 @@
+@file:OptIn(UnstableApi::class)
+
 package com.mymusic.app.player
 
 import android.app.NotificationChannel
@@ -9,7 +11,9 @@ import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession

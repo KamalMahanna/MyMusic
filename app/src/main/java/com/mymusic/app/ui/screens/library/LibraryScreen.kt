@@ -71,10 +71,6 @@ fun LibraryScreen(
         }
     }
 
-    val playingIndex = remember(filteredSongList, currentPlayingSongId) {
-        filteredSongList.indexOfFirst { it.id == currentPlayingSongId }.takeIf { it != -1 }
-    }
-    
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (isTablet) 2 else 1),
         state = gridState,
@@ -179,9 +175,6 @@ fun LibraryScreen(
                     isDownloaded = true,
                     isDownloading = false,
                     isPlaying = isPlaying,
-                    index = index,
-                    totalCount = filteredSongList.size,
-                    playingIndex = playingIndex,
                     trailingContent = {
                         IconButton(onClick = {
                             songs.find { it.id == song.id }?.let { viewModel.deleteSong(it) }

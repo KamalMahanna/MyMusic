@@ -42,8 +42,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -739,10 +737,7 @@ fun QueueView(
                             isDownloaded = isDownloaded,
                             isDownloading = isDownloading,
                             isPlaying = isPlaying,
-                            downloadProgress = downloadStates[song.id]?.progress,
-                            index = index,
-                            totalCount = queue.size,
-                            playingIndex = currentIndex
+                            downloadProgress = downloadStates[song.id]?.progress
                         )
                     }
                 }

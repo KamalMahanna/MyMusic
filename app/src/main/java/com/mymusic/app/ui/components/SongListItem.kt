@@ -2,15 +2,12 @@
 
 package com.mymusic.app.ui.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,7 +15,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DownloadDone
@@ -38,18 +34,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mymusic.app.data.model.Song
 
-fun groupedSongItemShape(
-    index: Int,
-    totalCount: Int,
-    playingIndex: Int? = null
-): RoundedCornerShape {
-    return if (playingIndex != null && index == playingIndex) {
-        RoundedCornerShape(percent = 50)
-    } else {
-        RoundedCornerShape(12.dp)
-    }
-}
-
 @Composable
 fun SongListItem(
     song: Song,
@@ -60,9 +44,6 @@ fun SongListItem(
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false,
     downloadProgress: Float? = null,
-    index: Int = 0,
-    totalCount: Int = 1,
-    playingIndex: Int? = null,
     trailingContent: @Composable (() -> Unit)? = null
 ) {
     val haptics = LocalHapticFeedback.current
