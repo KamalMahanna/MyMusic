@@ -395,11 +395,11 @@ fun PlayerScreen(
                                     colors = sliderColors,
                                     interactionSource = interactionSource,
                                     track = { sliderState ->
-                                        LinearProgressIndicator(
+                                        LinearWavyProgressIndicator(
                                             progress = { sliderState.coercedValueAsFraction },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(8.dp),
+                                                .height(10.dp),
                                             color = MaterialTheme.colorScheme.primary,
                                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
@@ -788,11 +788,11 @@ private fun TabletNowPlayingContent(
             colors = sliderColors,
             interactionSource = interactionSource,
             track = { sliderState ->
-                LinearProgressIndicator(
+                LinearWavyProgressIndicator(
                     progress = { sliderState.coercedValueAsFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp),
+                        .height(10.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
