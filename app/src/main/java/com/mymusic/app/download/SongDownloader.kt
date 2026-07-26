@@ -41,9 +41,6 @@ class SongDownloader @Inject constructor(
     private val downloadRepository: DownloadRepository,
     private val okHttpClient: OkHttpClient
 ) {
-    private val _downloadState = MutableStateFlow(DownloadState())
-    val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
-
     private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
     val downloadStates: StateFlow<Map<String, DownloadState>> = _downloadStates.asStateFlow()
 
@@ -85,7 +82,6 @@ class SongDownloader @Inject constructor(
             songName = song.name,
             isDownloading = true
         )
-        _downloadState.value = startState
         _downloadStates.update { it + (song.id to startState) }
 
         val tempFile = File(context.cacheDir, "temp_download_${song.id}.m4a")
@@ -105,7 +101,6 @@ class SongDownloader @Inject constructor(
                     isDownloading = false,
                     error = "Download failed: ${response.code}"
                 )
-                _downloadState.value = errorState
                 _downloadStates.update { it + (song.id to errorState) }
                 return@withContext false
             }
@@ -117,7 +112,6 @@ class SongDownloader @Inject constructor(
                     isDownloading = false,
                     error = "Empty response body"
                 )
-                _downloadState.value = errorState
                 _downloadStates.update { it + (song.id to errorState) }
                 return@withContext false
             }
@@ -140,7 +134,6 @@ class SongDownloader @Inject constructor(
                         } else 0f
 
                         val progressState = (_downloadStates.value[song.id] ?: DownloadState(songId = song.id, songName = song.name, isDownloading = true)).copy(progress = progress)
-                        _downloadState.value = progressState
                         _downloadStates.update { it + (song.id to progressState) }
                         updateNotification(song.name, (progress * 100).toInt())
                     }
@@ -164,7 +157,6 @@ class SongDownloader @Inject constructor(
                 isDownloading = false,
                 isComplete = true
             )
-            _downloadState.value = completeState
             _downloadStates.update { it + (song.id to completeState) }
 
             showCompleteNotification(song.name)
@@ -180,7 +172,6 @@ class SongDownloader @Inject constructor(
                 isDownloading = false,
                 error = e.message
             )
-            _downloadState.value = exceptionState
             _downloadStates.update { it + (song.id to exceptionState) }
             false
         }

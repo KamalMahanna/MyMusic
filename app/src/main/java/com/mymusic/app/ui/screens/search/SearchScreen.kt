@@ -124,7 +124,7 @@ fun SearchScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .focusRequester(focusRequester),
-            placeholder = { Text("Search songs, artists, albums...") },
+            placeholder = { Text("Search it") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Rounded.Search,

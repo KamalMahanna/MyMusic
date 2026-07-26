@@ -25,7 +25,6 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
 
     val playbackState = musicPlayerManager.playbackState
-    val downloadState = songDownloader.downloadState
     val downloadStates = songDownloader.downloadStates
     val queue = queueManager.queue
     val queueIndex = queueManager.currentIndex
@@ -66,15 +65,6 @@ class PlayerViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = false
-        )
-
-    val activeDownloadSongId: StateFlow<String?> = songDownloader.downloadState
-        .map { if (it.isDownloading) it.songId else null }
-        .distinctUntilChanged()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
         )
 
     fun playSongFromList(songs: List<Song>, index: Int) {

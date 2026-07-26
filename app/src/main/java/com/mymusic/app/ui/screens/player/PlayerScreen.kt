@@ -550,7 +550,6 @@ fun QueueView(
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentIndex by viewModel.queueIndex.collectAsState()
-    val activeDownloadSongId by viewModel.activeDownloadSongId.collectAsState(initial = null)
     val downloadedSongs by viewModel.downloadedSongs.collectAsState(initial = emptyList())
     val downloadStates by viewModel.downloadStates.collectAsState()
 

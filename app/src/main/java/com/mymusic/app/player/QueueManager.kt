@@ -141,24 +141,6 @@ class QueueManager @Inject constructor(
         saveState()
     }
 
-    fun addToQueue(song: Song) {
-        val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-        if (!playedSongIds.contains(song.id) && !playedKeys.contains(key)) {
-            Log.d(TAG, "addToQueue: adding song='${song.name}'")
-            _queue.value = _queue.value + song
-            originalQueue = if (_isShuffleEnabled.value) {
-                originalQueue + song
-            } else {
-                _queue.value
-            }
-            playedSongIds.add(song.id)
-            playedKeys.add(key)
-            saveState()
-        } else {
-            Log.d(TAG, "addToQueue: skipped duplicate song='${song.name}'")
-        }
-    }
-
     fun addToQueue(songs: List<Song>) {
         val newSongs = songs.filter { song ->
             val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
