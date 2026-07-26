@@ -86,8 +86,8 @@ data class Song(
             ?: downloadUrl.lastOrNull()?.url
     
     val primaryArtistNames: String
-        get() = artists.primary.joinToString(", ") { it.name }.ifEmpty {
-            artists.all.joinToString(", ") { it.name }
+        get() = artists.primary.map { it.name }.sortedWith(String.CASE_INSENSITIVE_ORDER).joinToString(", ").ifEmpty {
+            artists.all.map { it.name }.sortedWith(String.CASE_INSENSITIVE_ORDER).joinToString(", ")
         }
     
     val durationFormatted: String
