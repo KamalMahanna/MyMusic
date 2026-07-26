@@ -90,7 +90,6 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        promoteToForegroundImmediate()
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -113,12 +112,12 @@ class MusicService : MediaLibraryService() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
-                    1001,
+                    FALLBACK_NOTIFICATION_ID,
                     fallbackNotification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
                 )
             } else {
-                startForeground(1001, fallbackNotification)
+                startForeground(FALLBACK_NOTIFICATION_ID, fallbackNotification)
             }
             Log.d(TAG, "Promoted service to foreground successfully")
         } catch (e: Exception) {
@@ -175,5 +174,6 @@ class MusicService : MediaLibraryService() {
     companion object {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "mymusic_playback"
+        private const val FALLBACK_NOTIFICATION_ID = 2001
     }
 }
