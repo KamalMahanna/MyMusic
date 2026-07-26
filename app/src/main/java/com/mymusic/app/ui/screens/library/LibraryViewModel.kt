@@ -38,13 +38,19 @@ class LibraryViewModel @Inject constructor(
     
     fun getAsSongList(): List<Song> {
         return downloadedSongs.value.map { ds ->
+            val artistList = ds.artist.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                .map { com.mymusic.app.data.model.ArtistMap(name = it) }
+
             Song(
                 id = ds.id,
                 name = ds.name,
                 url = ds.filePath, // Use file path as URL for local playback
                 duration = ds.duration,
                 artists = com.mymusic.app.data.model.SongArtists(
-                    primary = listOf(com.mymusic.app.data.model.ArtistMap(name = ds.artist))
+                    primary = artistList
                 ),
                 image = if (!ds.imageUrl.isNullOrEmpty()) {
                     listOf(com.mymusic.app.data.model.DownloadLink(quality = "500x500", url = ds.imageUrl))

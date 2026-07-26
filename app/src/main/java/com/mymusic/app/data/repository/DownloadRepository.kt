@@ -34,11 +34,23 @@ class DownloadRepository @Inject constructor(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    private fun formatSortedArtistNames(rawArtist: String): String {
+        if (rawArtist.isBlank()) return rawArtist
+        return rawArtist.split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .sortedWith(String.CASE_INSENSITIVE_ORDER)
+            .joinToString(", ")
+    }
+
     init {
         // Collect DB changes and update StateFlow and in-memory caches
         repositoryScope.launch {
             downloadedSongDao.getAllDownloadedSongs().collect { songs ->
-                val sortedSongs = songs.sortedByDescending { it.filePath }
+                val sortedSongs = songs.map { song ->
+                    val sortedArtist = formatSortedArtistNames(song.artist)
+                    if (sortedArtist != song.artist) song.copy(artist = sortedArtist) else song
+                }.sortedByDescending { it.filePath }
                 _downloadedSongs.value = sortedSongs
                 downloadedFileNames = songs.map { File(it.filePath).name.lowercase() }.toSet()
                 Log.d(TAG, "Database flow emitted ${songs.size} songs. In-memory cache updated.")
@@ -194,7 +206,7 @@ class DownloadRepository @Inject constructor(
                 DownloadedSong(
                     id = file.absolutePath.hashCode().toString(),
                     name = name,
-                    artist = artist,
+                    artist = formatSortedArtistNames(artist),
                     album = album,
                     duration = duration,
                     filePath = file.absolutePath,
