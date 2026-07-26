@@ -2,6 +2,7 @@ package com.mymusic.app.data.api
 
 import android.util.Base64
 import com.mymusic.app.data.model.*
+import com.mymusic.app.utils.SongDeduplicator
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.delay
@@ -633,9 +634,7 @@ class SaavnApiImpl @Inject constructor(
                             val playlistMap = parseJsonToMap(playlistJson)
                             val playlist = parsePlaylist(playlistMap)
                             if (playlist != null) {
-                                val uniqueSongs = playlist.songs?.distinctBy { song ->
-                                    song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-                                } ?: emptyList()
+                                val uniqueSongs = SongDeduplicator.deduplicate(playlist.songs)
                                 return ApiResponse(true, playlist.copy(id = id, name = stationInfo.title + " Radio", songCount = uniqueSongs.size, songs = uniqueSongs))
                             }
                         }
@@ -644,9 +643,7 @@ class SaavnApiImpl @Inject constructor(
                     }
                 }
 
-                val uniqueSongs = songs.distinctBy { song ->
-                    song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-                }
+                val uniqueSongs = SongDeduplicator.deduplicate(songs)
                 val defaultPlaylist = Playlist(
                     id = id,
                     name = stationInfo.title + " Radio",
@@ -674,9 +671,7 @@ class SaavnApiImpl @Inject constructor(
             )
             val map = parseJsonToMap(json) ?: return ApiResponse(false, null)
             val playlist = parsePlaylist(map) ?: return ApiResponse(false, null)
-            val uniqueSongs = playlist.songs?.distinctBy { song ->
-                song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-            } ?: emptyList()
+            val uniqueSongs = SongDeduplicator.deduplicate(playlist.songs)
             ApiResponse(true, playlist.copy(songCount = uniqueSongs.size, songs = uniqueSongs))
         } catch (e: Exception) {
             ApiResponse(false, null)

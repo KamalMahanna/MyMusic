@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.MusicRepository
+import com.mymusic.app.utils.SongDeduplicator
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,14 +103,7 @@ class QueueManager @Inject constructor(
         Log.d(TAG, "setQueue: input size=${songs.size}, startIndex=$startIndex")
         val originalTargetSong = if (startIndex in songs.indices) songs[startIndex] else null
 
-        val uniqueSongs = mutableListOf<Song>()
-        val seenKeys = mutableSetOf<Pair<String, String>>()
-        songs.forEach { song ->
-            val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
-            if (seenKeys.add(key)) {
-                uniqueSongs.add(song)
-            }
-        }
+        val uniqueSongs = SongDeduplicator.deduplicate(songs)
         Log.d(TAG, "setQueue: after deduplication, queue size=${uniqueSongs.size}")
 
         originalQueue = uniqueSongs

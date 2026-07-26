@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mymusic.app.data.model.*
 import com.mymusic.app.data.repository.MusicRepository
+import com.mymusic.app.utils.SongDeduplicator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -79,8 +80,7 @@ class SearchViewModel @Inject constructor(
                 val rawPlaylists = playlistsResult.getOrNull()?.results ?: emptyList()
 
                 // Deduplicate and sort songs by playCount desc
-                val cleanSongs = rawSongs
-                    .distinctBy { song -> song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim() }
+                val cleanSongs = SongDeduplicator.deduplicate(rawSongs)
                     .sortedByDescending { it.playCount ?: 0 }
 
                 // Deduplicate albums by ID
@@ -115,9 +115,8 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.getArtistById(artistId)
                 .onSuccess { detail ->
-                    val deduplicatedTopSongs = detail.topSongs
-                        ?.distinctBy { song -> song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim() }
-                    val cleanDetail = if (deduplicatedTopSongs != null) detail.copy(topSongs = deduplicatedTopSongs) else detail
+                    val deduplicatedTopSongs = SongDeduplicator.deduplicate(detail.topSongs)
+                    val cleanDetail = if (detail.topSongs != null) detail.copy(topSongs = deduplicatedTopSongs) else detail
                     _uiState.value = _uiState.value.copy(
                         isArtistDetailLoading = false,
                         selectedArtistDetail = cleanDetail
@@ -137,9 +136,8 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.getPlaylistById(playlistId)
                 .onSuccess { detail ->
-                    val deduplicatedSongs = detail.songs
-                        ?.distinctBy { song -> song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim() }
-                    val cleanDetail = if (deduplicatedSongs != null) detail.copy(songs = deduplicatedSongs) else detail
+                    val deduplicatedSongs = SongDeduplicator.deduplicate(detail.songs)
+                    val cleanDetail = if (detail.songs != null) detail.copy(songs = deduplicatedSongs) else detail
                     _uiState.value = _uiState.value.copy(
                         isPlaylistDetailLoading = false,
                         selectedPlaylist = cleanDetail
@@ -159,9 +157,8 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             musicRepository.getAlbumById(albumId)
                 .onSuccess { detail ->
-                    val deduplicatedSongs = detail.songs
-                        ?.distinctBy { song -> song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim() }
-                    val cleanDetail = if (deduplicatedSongs != null) detail.copy(songs = deduplicatedSongs) else detail
+                    val deduplicatedSongs = SongDeduplicator.deduplicate(detail.songs)
+                    val cleanDetail = if (detail.songs != null) detail.copy(songs = deduplicatedSongs) else detail
                     _uiState.value = _uiState.value.copy(
                         isAlbumDetailLoading = false,
                         selectedAlbum = cleanDetail
