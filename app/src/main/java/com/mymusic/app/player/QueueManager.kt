@@ -222,6 +222,13 @@ class QueueManager @Inject constructor(
             Log.w(TAG, "loadMoreSuggestions: current song is null, cannot load suggestions")
             return
         }
+        // Downloaded/scanned songs have IDs generated via absolutePath.hashCode().toString(),
+        // which are purely numeric (possibly negative). These are not valid Saavn API IDs,
+        // so skip the suggestions API call to avoid costly retry storms that freeze the app.
+        if (current.id.matches(Regex("^-?\\d+$"))) {
+            Log.d(TAG, "loadMoreSuggestions: skipping for local song (hash ID='${current.id}')")
+            return
+        }
         Log.d(TAG, "loadMoreSuggestions: triggering suggestions request for songId='${current.id}'")
         isLoadingSuggestions = true
 
