@@ -215,6 +215,10 @@ class SongDownloader @Inject constructor(
             tag.setField(FieldKey.TITLE, song.name)
             tag.setField(FieldKey.ARTIST, song.primaryArtistNames)
             tag.setField(FieldKey.ALBUM, song.album.name ?: "")
+            // Persist the JioSaavn song ID so it survives app data clears.
+            // On rescan, DownloadRepository reads this back to restore the real ID
+            // instead of generating a hash-code placeholder.
+            tag.setField(FieldKey.COMMENT, "saavn_id:${song.id}")
 
             // Download and embed cover art
             val imageBytes = downloadArtworkBytes(song.highQualityImageUrl)
