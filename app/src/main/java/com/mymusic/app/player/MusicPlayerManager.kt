@@ -270,78 +270,50 @@ class MusicPlayerManager @Inject constructor(
             }
         }
 
+        // Start playback immediately with URI-only metadata.
+        // Artwork is fetched asynchronously and patched in afterward so that
+        // playback is never blocked — especially important when the screen is off
+        // and Coil's image pipeline may stall or be throttled by the OS.
+        val metadata = MediaMetadata.Builder()
+            .setTitle(song.name)
+            .setArtist(song.primaryArtistNames)
+            .setAlbumTitle(song.album.name)
+            .setArtworkUri(artworkUri)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(uri)
+            .setMediaMetadata(metadata)
+            .build()
+
+        player.setMediaItem(mediaItem)
+        player.prepare()
+        player.play()
+        Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
+
+        // Fetch artwork in background and patch metadata once available
         scope.launch {
-            // Fetch artwork with 150ms timeout to avoid delaying playback
             val artworkBitmap = withContext(Dispatchers.IO) {
                 try {
-                    withTimeoutOrNull(150) {
-                        when {
-                            localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
-                            song.highQualityImageUrl != null -> {
-                                val request = ImageRequest.Builder(context)
-                                    .data(song.highQualityImageUrl)
-                                    .allowHardware(false)
-                                    .build()
-                                (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
-                            }
-                            else -> null
+                    when {
+                        localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
+                        song.highQualityImageUrl != null -> {
+                            val request = ImageRequest.Builder(context)
+                                .data(song.highQualityImageUrl)
+                                .allowHardware(false)
+                                .build()
+                            (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
                         }
+                        else -> null
                     }
                 } catch (e: Exception) {
+                    Log.w(TAG, "Artwork fetch failed for '${song.name}': ${e.message}")
                     null
                 }
             }
 
-            val artworkBytes = artworkBitmap?.let { bitmap ->
-                try {
-                    ByteArrayOutputStream().use { stream ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-                        stream.toByteArray()
-                    }
-                } catch (e: Exception) {
-                    null
-                }
-            }
-
-            val metadataBuilder = MediaMetadata.Builder()
-                .setTitle(song.name)
-                .setArtist(song.primaryArtistNames)
-                .setAlbumTitle(song.album.name)
-                .setArtworkUri(artworkUri)
-            if (artworkBytes != null) {
-                metadataBuilder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-            }
-
-            val mediaItem = MediaItem.Builder()
-                .setUri(uri)
-                .setMediaMetadata(metadataBuilder.build())
-                .build()
-
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
-            Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked (hasArtworkData=${artworkBytes != null})")
-
-            // Fallback: If artwork timed out, fetch it fully in background and patch metadata
-            if (artworkBitmap == null && song.highQualityImageUrl != null) {
-                launch(Dispatchers.IO) {
-                    try {
-                        val request = ImageRequest.Builder(context)
-                            .data(song.highQualityImageUrl)
-                            .allowHardware(false)
-                            .build()
-                        val result = (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
-                        if (result != null) {
-                            withContext(Dispatchers.Main) {
-                                if (_playbackState.value.currentSong?.id == song.id) {
-                                    updateArtworkMetadata(player, result, song)
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Fallback artwork fetch failed: ${e.message}")
-                    }
-                }
+            if (artworkBitmap != null && _playbackState.value.currentSong?.id == song.id) {
+                updateArtworkMetadata(player, artworkBitmap, song)
             }
 
             // Check if we need more suggestions
