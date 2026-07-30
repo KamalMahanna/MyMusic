@@ -41,7 +41,6 @@ class LibraryViewModel @Inject constructor(
             val artistList = ds.artist.split(",")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
-                .sortedWith(String.CASE_INSENSITIVE_ORDER)
                 .map { com.mymusic.app.data.model.ArtistMap(name = it) }
 
             Song(

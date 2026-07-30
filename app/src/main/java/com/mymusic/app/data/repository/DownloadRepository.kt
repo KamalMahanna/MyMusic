@@ -36,12 +36,11 @@ class DownloadRepository @Inject constructor(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private fun formatSortedArtistNames(rawArtist: String): String {
+    private fun formatArtistNames(rawArtist: String): String {
         if (rawArtist.isBlank()) return rawArtist
         return rawArtist.split(",")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-            .sortedWith(String.CASE_INSENSITIVE_ORDER)
             .joinToString(", ")
     }
 
@@ -50,8 +49,8 @@ class DownloadRepository @Inject constructor(
         repositoryScope.launch {
             downloadedSongDao.getAllDownloadedSongs().collect { songs ->
                 val sortedSongs = songs.map { song ->
-                    val sortedArtist = formatSortedArtistNames(song.artist)
-                    if (sortedArtist != song.artist) song.copy(artist = sortedArtist) else song
+                    val formattedArtist = formatArtistNames(song.artist)
+                    if (formattedArtist != song.artist) song.copy(artist = formattedArtist) else song
                 }.sortedByDescending { it.filePath }
                 _downloadedSongs.value = sortedSongs
                 downloadedFileNames = songs.map { File(it.filePath).name.lowercase() }.toSet()
@@ -226,7 +225,7 @@ class DownloadRepository @Inject constructor(
                 DownloadedSong(
                     id = saavnId ?: file.absolutePath.hashCode().toString(),
                     name = name,
-                    artist = formatSortedArtistNames(artist),
+                    artist = formatArtistNames(artist),
                     album = album,
                     duration = duration,
                     filePath = file.absolutePath,

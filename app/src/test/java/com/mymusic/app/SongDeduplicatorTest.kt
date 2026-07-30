@@ -47,6 +47,49 @@ class SongDeduplicatorTest {
         assertEquals(2, result.size)
     }
 
+    @Test
+    fun testPrimaryArtistNamesPreservesOriginalOrder() {
+        val song = Song(
+            id = "s1",
+            name = "Test Track",
+            artists = SongArtists(
+                primary = listOf(
+                    ArtistMap(id = "1", name = "Zebra Artist"),
+                    ArtistMap(id = "2", name = "Alpha Artist")
+                )
+            )
+        )
+        assertEquals("Zebra Artist, Alpha Artist", song.primaryArtistNames)
+    }
+
+    @Test
+    fun testDeduplicatorMatchesReorderedArtists() {
+        val song1 = Song(
+            id = "s1",
+            name = "Test Track",
+            duration = 200,
+            artists = SongArtists(
+                primary = listOf(
+                    ArtistMap(id = "1", name = "Zebra Artist"),
+                    ArtistMap(id = "2", name = "Alpha Artist")
+                )
+            )
+        )
+        val song2 = Song(
+            id = "s2",
+            name = "Test Track",
+            duration = 200,
+            artists = SongArtists(
+                primary = listOf(
+                    ArtistMap(id = "2", name = "Alpha Artist"),
+                    ArtistMap(id = "1", name = "Zebra Artist")
+                )
+            )
+        )
+        val result = SongDeduplicator.deduplicate(listOf(song1, song2))
+        assertEquals(1, result.size)
+    }
+
     private fun createSong(
         id: String,
         name: String,
