@@ -154,8 +154,9 @@ class DownloadRepository @Inject constructor(
         // 2. Scan and add files that are on disk but not in the database (new or unmigrated downloads)
         val filesToScan = files.filter { !dbSongsByPath.containsKey(it.absolutePath) }
         if (filesToScan.isNotEmpty()) {
-            Log.d(TAG, "refreshDownloadedSongs: Scanning ${filesToScan.size} new/untracked files on disk")
-            val songsToInsert = filesToScan.map { file ->
+            Log.d(TAG, "refreshDownloadedSongs: Scanning ${filesToScan.size} new/untracked files on disk progressively")
+            val batch = mutableListOf<DownloadedSong>()
+            for (file in filesToScan) {
                 val retriever = android.media.MediaMetadataRetriever()
                 var name = file.nameWithoutExtension
                 var artist = "Unknown Artist"
@@ -222,7 +223,7 @@ class DownloadRepository @Inject constructor(
                     Log.w(TAG, "refreshDownloadedSongs: Could not read COMMENT tag from '${file.name}': ${e.message}")
                 }
 
-                DownloadedSong(
+                val ds = DownloadedSong(
                     id = saavnId ?: file.absolutePath.hashCode().toString(),
                     name = name,
                     artist = formatArtistNames(artist),
@@ -232,11 +233,17 @@ class DownloadRepository @Inject constructor(
                     imageUrl = imageUrl,
                     fileSize = file.length()
                 )
+                batch.add(ds)
+                if (batch.size >= 3) {
+                    downloadedSongDao.insertDownloadedSongs(batch.toList())
+                    Log.d(TAG, "refreshDownloadedSongs: Progressive batch inserted ${batch.size} songs")
+                    batch.clear()
+                }
             }
-            
-            if (songsToInsert.isNotEmpty()) {
-                downloadedSongDao.insertDownloadedSongs(songsToInsert)
-                Log.d(TAG, "refreshDownloadedSongs: Successfully cached ${songsToInsert.size} new songs in SQLite")
+            if (batch.isNotEmpty()) {
+                downloadedSongDao.insertDownloadedSongs(batch.toList())
+                Log.d(TAG, "refreshDownloadedSongs: Final progressive batch inserted ${batch.size} songs")
+                batch.clear()
             }
         } else {
             Log.d(TAG, "refreshDownloadedSongs: Cache is fully synchronized with disk. No scans needed.")

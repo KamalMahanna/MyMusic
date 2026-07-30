@@ -348,6 +348,15 @@ class MusicPlayerManager @Inject constructor(
      */
     private fun updateArtworkMetadata(player: Player, bitmap: Bitmap, song: Song) {
         try {
+            val currentMediaItem = player.currentMediaItem ?: run {
+                Log.w(TAG, "updateArtworkMetadata: currentMediaItem is null, skipping update for '${song.name}'")
+                return
+            }
+            val currentIndex = player.currentMediaItemIndex
+            if (currentIndex < 0 || currentIndex >= player.mediaItemCount) {
+                Log.w(TAG, "updateArtworkMetadata: index $currentIndex out of bounds (count=${player.mediaItemCount})")
+                return
+            }
             val bytes = ByteArrayOutputStream().use { stream ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
                 stream.toByteArray()
@@ -357,8 +366,8 @@ class MusicPlayerManager @Inject constructor(
                 .setArtworkData(bytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 .build()
             player.replaceMediaItem(
-                player.currentMediaItemIndex,
-                player.currentMediaItem!!.buildUpon()
+                currentIndex,
+                currentMediaItem.buildUpon()
                     .setMediaMetadata(updatedMetadata)
                     .build()
             )

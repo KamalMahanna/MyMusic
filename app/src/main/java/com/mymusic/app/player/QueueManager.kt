@@ -38,6 +38,11 @@ class QueueManager @Inject constructor(
     private val playedKeys = mutableSetOf<Pair<String, String>>()
     private var isLoadingSuggestions = false
 
+    // Downloaded Music Paging & Sliding Window state
+    private var fullDownloadedSourceList: List<Song> = emptyList()
+    private var downloadedSourceNextIndex: Int = 0
+    private var isDownloadedQueueMode: Boolean = false
+
     private val saveScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
 
@@ -107,6 +112,15 @@ class QueueManager @Inject constructor(
     }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0) {
+        val isDownloaded = songs.isNotEmpty() && songs.first().url.let { it.startsWith("/") || it.startsWith("file:") }
+        if (isDownloaded) {
+            setDownloadedQueue(songs, startIndex)
+            return
+        }
+
+        isDownloadedQueueMode = false
+        fullDownloadedSourceList = emptyList()
+
         Log.d(TAG, "setQueue: input size=${songs.size}, startIndex=$startIndex")
         val originalTargetSong = if (startIndex in songs.indices) songs[startIndex] else null
 
@@ -142,6 +156,44 @@ class QueueManager @Inject constructor(
         saveState()
     }
 
+    fun setDownloadedQueue(songs: List<Song>, startIndex: Int = 0) {
+        Log.d(TAG, "setDownloadedQueue: total downloaded songs=${songs.size}, startIndex=$startIndex, shuffle=${_isShuffleEnabled.value}")
+        if (songs.isEmpty()) return
+
+        isDownloadedQueueMode = true
+        val safeIndex = startIndex.coerceIn(0, songs.size - 1)
+        val targetSong = songs[safeIndex]
+
+        val orderedSource = if (_isShuffleEnabled.value) {
+            val rest = songs.filter { it.id != targetSong.id }.shuffled()
+            listOf(targetSong) + rest
+        } else {
+            val subAfter = songs.subList(safeIndex, songs.size)
+            val subBefore = songs.subList(0, safeIndex)
+            subAfter + subBefore
+        }
+
+        fullDownloadedSourceList = orderedSource
+
+        // Initial queue batch: clicked song + next 30 downloaded songs (total max 31)
+        val initialBatch = orderedSource.take(31)
+        downloadedSourceNextIndex = if (orderedSource.size > 31) 31 else orderedSource.size
+
+        originalQueue = orderedSource
+        _queue.value = initialBatch
+        _currentIndex.value = 0
+
+        playedSongIds.clear()
+        playedKeys.clear()
+        initialBatch.forEach {
+            playedSongIds.add(it.id)
+            playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+        }
+
+        Log.d(TAG, "setDownloadedQueue initialized: active queue size=${initialBatch.size}, targetSong='${targetSong.name}', nextIndex=$downloadedSourceNextIndex")
+        saveState()
+    }
+
     fun addToQueue(songs: List<Song>) {
         val newSongs = songs.filter { song ->
             val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
@@ -157,15 +209,37 @@ class QueueManager @Inject constructor(
                     uniqueIncoming.add(song)
                 }
             }
-            _queue.value = _queue.value + uniqueIncoming
+            
+            var updatedQueue = _queue.value + uniqueIncoming
+            var updatedIndex = _currentIndex.value
+
+            uniqueIncoming.forEach {
+                playedSongIds.add(it.id)
+                playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+            }
+
+            // Cap total queue size at max 60 items by trimming older played items
+            val maxQueueSize = 60
+            if (updatedQueue.size > maxQueueSize && updatedIndex > 0) {
+                val excess = updatedQueue.size - maxQueueSize
+                val trimCount = excess.coerceAtMost(updatedIndex)
+                if (trimCount > 0) {
+                    val evicted = updatedQueue.take(trimCount)
+                    updatedQueue = updatedQueue.drop(trimCount)
+                    updatedIndex -= trimCount
+                    evicted.forEach {
+                        playedSongIds.remove(it.id)
+                        playedKeys.remove(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+                    }
+                }
+            }
+
+            _queue.value = updatedQueue
+            _currentIndex.value = updatedIndex
             originalQueue = if (_isShuffleEnabled.value) {
                 originalQueue + uniqueIncoming
             } else {
                 _queue.value
-            }
-            uniqueIncoming.forEach {
-                playedSongIds.add(it.id)
-                playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
             }
             Log.d(TAG, "addToQueue (bulk): new total queue size=${_queue.value.size}")
             saveState()
@@ -175,11 +249,17 @@ class QueueManager @Inject constructor(
     fun moveToNext(): Song? {
         val nextIndex = _currentIndex.value + 1
         Log.d(TAG, "moveToNext: target index=$nextIndex, queue size=${_queue.value.size}")
-        return if (nextIndex < _queue.value.size) {
-            _currentIndex.value = nextIndex
-            Log.d(TAG, "moveToNext: moved to '${_queue.value[nextIndex].name}'")
+        if (isNearEnd()) {
+            if (isDownloadedQueueMode) {
+                loadMoreDownloadedSongs()
+            }
+        }
+        val idx = _currentIndex.value + 1
+        return if (idx < _queue.value.size) {
+            _currentIndex.value = idx
+            Log.d(TAG, "moveToNext: moved to '${_queue.value[idx].name}'")
             saveState()
-            _queue.value[nextIndex]
+            _queue.value[idx]
         } else {
             Log.d(TAG, "moveToNext: already at end of queue")
             null
@@ -229,9 +309,18 @@ class QueueManager @Inject constructor(
             Log.w(TAG, "loadMoreSuggestions: current song is null, cannot load suggestions")
             return
         }
-        // Downloaded/scanned songs have IDs generated via absolutePath.hashCode().toString(),
-        // which are purely numeric (possibly negative). These are not valid Saavn API IDs,
-        // so skip the suggestions API call to avoid costly retry storms that freeze the app.
+
+        if (isDownloadedQueueMode) {
+            Log.d(TAG, "loadMoreSuggestions: appending next batch of downloaded songs")
+            isLoadingSuggestions = true
+            try {
+                loadMoreDownloadedSongs()
+            } finally {
+                isLoadingSuggestions = false
+            }
+            return
+        }
+
         if (current.id.matches(Regex("^-?\\d+$"))) {
             Log.d(TAG, "loadMoreSuggestions: skipping for local song (hash ID='${current.id}')")
             return
@@ -252,11 +341,89 @@ class QueueManager @Inject constructor(
         }
     }
 
+    private fun loadMoreDownloadedSongs() {
+        if (fullDownloadedSourceList.isEmpty()) return
+        
+        val batch = mutableListOf<Song>()
+        var count = 0
+        var pointer = downloadedSourceNextIndex
+        val total = fullDownloadedSourceList.size
+
+        while (count < 30 && count < total) {
+            val song = fullDownloadedSourceList[pointer]
+            val key = song.name.lowercase().trim() to song.primaryArtistNames.lowercase().trim()
+            if (!_queue.value.any { it.id == song.id } && !playedKeys.contains(key)) {
+                batch.add(song)
+            }
+            pointer = (pointer + 1) % total
+            count++
+            if (pointer == downloadedSourceNextIndex) break
+        }
+        downloadedSourceNextIndex = pointer
+
+        if (batch.isEmpty()) {
+            Log.d(TAG, "loadMoreDownloadedSongs: no new songs to append from source list")
+            return
+        }
+
+        Log.d(TAG, "loadMoreDownloadedSongs: Appending ${batch.size} downloaded songs to queue")
+        var updatedQueue = _queue.value + batch
+        var updatedIndex = _currentIndex.value
+
+        batch.forEach {
+            playedSongIds.add(it.id)
+            playedKeys.add(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+        }
+
+        // Cap total queue size at 60 max by evicting older played songs from the front
+        val maxQueueSize = 60
+        if (updatedQueue.size > maxQueueSize && updatedIndex > 0) {
+            val excess = updatedQueue.size - maxQueueSize
+            val trimCount = excess.coerceAtMost(updatedIndex)
+            if (trimCount > 0) {
+                val evicted = updatedQueue.take(trimCount)
+                updatedQueue = updatedQueue.drop(trimCount)
+                updatedIndex -= trimCount
+                evicted.forEach {
+                    playedSongIds.remove(it.id)
+                    playedKeys.remove(it.name.lowercase().trim() to it.primaryArtistNames.lowercase().trim())
+                }
+                Log.d(TAG, "loadMoreDownloadedSongs: Trimmed $trimCount played songs from head. New queue size=${updatedQueue.size}, new index=$updatedIndex")
+            }
+        }
+
+        _queue.value = updatedQueue
+        _currentIndex.value = updatedIndex
+        originalQueue = if (_isShuffleEnabled.value) originalQueue + batch else updatedQueue
+        saveState()
+    }
+
     fun toggleShuffle() {
         val enabled = !_isShuffleEnabled.value
         _isShuffleEnabled.value = enabled
         
         val current = currentSong
+        if (isDownloadedQueueMode && fullDownloadedSourceList.isNotEmpty()) {
+            if (enabled) {
+                if (current != null) {
+                    val rest = fullDownloadedSourceList.filter { it.id != current.id }.shuffled()
+                    fullDownloadedSourceList = listOf(current) + rest
+                } else {
+                    fullDownloadedSourceList = fullDownloadedSourceList.shuffled()
+                }
+            } else {
+                if (originalQueue.isNotEmpty()) {
+                    fullDownloadedSourceList = originalQueue
+                }
+            }
+            val initialBatch = fullDownloadedSourceList.take(31)
+            downloadedSourceNextIndex = if (fullDownloadedSourceList.size > 31) 31 else fullDownloadedSourceList.size
+            _queue.value = initialBatch
+            _currentIndex.value = if (current != null) initialBatch.indexOfFirst { it.id == current.id }.coerceAtLeast(0) else 0
+            saveState()
+            return
+        }
+
         if (enabled) {
             originalQueue = _queue.value
             if (current != null) {
@@ -288,6 +455,8 @@ class QueueManager @Inject constructor(
         _queue.value = emptyList()
         originalQueue = emptyList()
         _currentIndex.value = -1
+        isDownloadedQueueMode = false
+        fullDownloadedSourceList = emptyList()
         playedSongIds.clear()
         playedKeys.clear()
         saveState()
