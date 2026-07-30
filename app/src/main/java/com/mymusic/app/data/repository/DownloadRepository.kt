@@ -87,6 +87,13 @@ class DownloadRepository @Inject constructor(
     }
 
     fun getReadableFileForSong(song: Song): File? {
+        if (song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:"))) {
+            val path = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
+            val directFile = File(path)
+            if (directFile.exists() && directFile.canRead()) {
+                return directFile
+            }
+        }
         val primaryFile = getFileForSong(song)
         if (primaryFile.exists() && primaryFile.canRead()) {
             return primaryFile
@@ -251,6 +258,17 @@ class DownloadRepository @Inject constructor(
     }
 
     fun getCachedArtworkForSong(song: Song): File? {
+        song.highQualityImageUrl?.let { url ->
+            if (url.startsWith("/") || url.startsWith("file:")) {
+                val path = if (url.startsWith("file://")) url.substring(7) else url
+                val imgFile = File(path)
+                if (imgFile.exists() && imgFile.canRead()) {
+                    Log.d(TAG, "getCachedArtworkForSong: Found artwork directly from highQualityImageUrl at '${imgFile.absolutePath}'")
+                    return imgFile
+                }
+            }
+        }
+
         val file = getReadableFileForSong(song)
         if (file == null) {
             Log.d(TAG, "getCachedArtworkForSong: Song file does not exist or is unreadable")
