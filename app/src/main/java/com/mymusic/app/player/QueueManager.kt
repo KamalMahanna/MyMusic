@@ -7,9 +7,13 @@ import com.mymusic.app.data.repository.MusicRepository
 import com.mymusic.app.utils.SongDeduplicator
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +38,7 @@ class QueueManager @Inject constructor(
     private val playedKeys = mutableSetOf<Pair<String, String>>()
     private var isLoadingSuggestions = false
 
+    private val saveScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
 
     val currentSong: Song?
@@ -48,19 +53,21 @@ class QueueManager @Inject constructor(
     }
 
     private fun saveState() {
-        try {
-            val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
-            val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
-            val originalJson = moshi.adapter<List<Song>>(listType).toJson(originalQueue)
-            sharedPreferences.edit()
-                .putString("KEY_QUEUE", json)
-                .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
-                .putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
-                .putString("KEY_ORIGINAL_QUEUE", originalJson)
-                .apply()
-            Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}, shuffle=${_isShuffleEnabled.value}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save queue state", e)
+        saveScope.launch {
+            try {
+                val listType = com.squareup.moshi.Types.newParameterizedType(List::class.java, Song::class.java)
+                val json = moshi.adapter<List<Song>>(listType).toJson(_queue.value)
+                val originalJson = moshi.adapter<List<Song>>(listType).toJson(originalQueue)
+                sharedPreferences.edit()
+                    .putString("KEY_QUEUE", json)
+                    .putInt("KEY_CURRENT_INDEX", _currentIndex.value)
+                    .putBoolean("KEY_SHUFFLE_ENABLED", _isShuffleEnabled.value)
+                    .putString("KEY_ORIGINAL_QUEUE", originalJson)
+                    .apply()
+                Log.d(TAG, "saveState success: queue size=${_queue.value.size}, index=${_currentIndex.value}, shuffle=${_isShuffleEnabled.value}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save queue state", e)
+            }
         }
     }
 

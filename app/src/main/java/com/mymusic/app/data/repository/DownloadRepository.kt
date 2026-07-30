@@ -78,8 +78,8 @@ class DownloadRepository @Inject constructor(
         }
 
     fun getFileForSong(song: Song): File {
-        val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
-        val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+        val sanitizedArtist = song.primaryArtistNames.replace(SANITIZE_REGEX, "").trim()
+        val sanitizedName = song.name.replace(SANITIZE_REGEX, "").trim()
         val fileName = "$sanitizedName - $sanitizedArtist.m4a"
         val targetFile = File(downloadDir, fileName)
         Log.d(TAG, "getFileForSong: Target file path '${targetFile.absolutePath}'")
@@ -92,8 +92,8 @@ class DownloadRepository @Inject constructor(
             return primaryFile
         }
         // Backward compatibility: check old .mp3 extension
-        val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
-        val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+        val sanitizedArtist = song.primaryArtistNames.replace(SANITIZE_REGEX, "").trim()
+        val sanitizedName = song.name.replace(SANITIZE_REGEX, "").trim()
         val mp3File = File(downloadDir, "$sanitizedName - $sanitizedArtist.mp3")
         if (mp3File.exists() && mp3File.canRead()) {
             return mp3File
@@ -104,8 +104,8 @@ class DownloadRepository @Inject constructor(
     fun isSongDownloaded(song: Song): Boolean {
         val names = downloadedFileNames
         if (names.isNotEmpty()) {
-            val sanitizedArtist = song.primaryArtistNames.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
-            val sanitizedName = song.name.replace(Regex("[^a-zA-Z0-9\\s]"), "").trim()
+            val sanitizedArtist = song.primaryArtistNames.replace(SANITIZE_REGEX, "").trim()
+            val sanitizedName = song.name.replace(SANITIZE_REGEX, "").trim()
             val m4aFileName = "$sanitizedName - $sanitizedArtist.m4a".lowercase()
             val mp3FileName = "$sanitizedName - $sanitizedArtist.mp3".lowercase()
             return names.contains(m4aFileName) || names.contains(mp3FileName)
@@ -315,5 +315,6 @@ class DownloadRepository @Inject constructor(
 
     companion object {
         private const val TAG = "DownloadRepository"
+        private val SANITIZE_REGEX = Regex("[^a-zA-Z0-9\\s]")
     }
 }

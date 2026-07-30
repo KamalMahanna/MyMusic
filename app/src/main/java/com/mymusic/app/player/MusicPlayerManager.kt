@@ -189,110 +189,127 @@ class MusicPlayerManager @Inject constructor(
             Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
         }
 
-        val readableFile = downloadRepository.getReadableFileForSong(song)
-        val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
-        
-        val uri = when {
-            song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
-                val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
-                val customFile = java.io.File(filePath)
-                if (customFile.exists() && customFile.canRead()) {
-                    Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
-                    if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
-                    else song.url
-                } else {
-                    Log.w(TAG, "Local file from song.url does not exist or is unreadable: $filePath. Falling back to other sources.")
-                    when {
-                        readableFile != null -> {
-                            Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
-                            android.net.Uri.fromFile(readableFile).toString()
-                        }
-                        cachedFile != null -> {
-                            Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
-                            android.net.Uri.fromFile(cachedFile).toString()
-                        }
-                        else -> {
-                            val dlUrl = song.highQualityDownloadUrl
-                            Log.d(TAG, "Using high quality download URL: $dlUrl")
-                            dlUrl ?: return
-                        }
-                    }
-                }
-            }
-            readableFile != null -> {
-                Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
-                android.net.Uri.fromFile(readableFile).toString()
-            }
-            cachedFile != null -> {
-                Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
-                android.net.Uri.fromFile(cachedFile).toString()
-            }
-            else -> {
-                val dlUrl = song.highQualityDownloadUrl
-                Log.d(TAG, "Using high quality download URL: $dlUrl")
-                dlUrl ?: return
-            }
-        }
-
-        val localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
-        val artworkUri = if (localArtworkFile != null) {
-            Log.d(TAG, "Using cached artwork: ${localArtworkFile.absolutePath}")
-            android.net.Uri.fromFile(localArtworkFile)
-        } else {
-            song.highQualityImageUrl?.let {
-                Log.d(TAG, "Using network artwork URL: $it")
-                it.toUri()
-            }
-        }
-
+        // Show buffering state immediately so the UI responds to the tap
         _playbackState.value = PlaybackState(
             currentSong = song,
             isPlaying = true,
             isBuffering = true
         )
 
-        // Reset saved position so the new song always starts from the beginning.
-        // Without this, the position saved during the previous song's playback would be
-        // applied on the next app restart (causing music to play from the wrong point).
-        try {
-            context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
-                .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to reset seek position", e)
-        }
-
-        cachingJob?.cancel()
-        streamingCacheManager.cleanTempFiles()
-        if (readableFile == null && cachedFile == null) {
-            cachingJob = scope.launch {
-                Log.d(TAG, "Triggering background caching for song '${song.name}'")
-                streamingCacheManager.cacheSong(song)
-            }
-        }
-
-        // Start playback immediately with URI-only metadata.
-        // Artwork is fetched asynchronously and patched in afterward so that
-        // playback is never blocked — especially important when the screen is off
-        // and Coil's image pipeline may stall or be throttled by the OS.
-        val metadata = MediaMetadata.Builder()
-            .setTitle(song.name)
-            .setArtist(song.primaryArtistNames)
-            .setAlbumTitle(song.album.name)
-            .setArtworkUri(artworkUri)
-            .build()
-
-        val mediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setMediaMetadata(metadata)
-            .build()
-
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        player.play()
-        Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
-
-        // Fetch artwork in background and patch metadata once available
+        // Move all file I/O off the main thread. ExoPlayer calls (setMediaItem,
+        // prepare, play) are dispatched back to Main once the URI is resolved.
         scope.launch {
+            val resolvedUri: String
+            val localArtworkFile: java.io.File?
+            val artworkUri: android.net.Uri?
+            val readableFile: java.io.File?
+            val cachedFile: java.io.File?
+
+            withContext(Dispatchers.IO) {
+                readableFile = downloadRepository.getReadableFileForSong(song)
+                cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
+
+                resolvedUri = when {
+                    song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
+                        val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
+                        val customFile = java.io.File(filePath)
+                        if (customFile.exists() && customFile.canRead()) {
+                            Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
+                            if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
+                            else song.url
+                        } else {
+                            Log.w(TAG, "Local file from song.url does not exist or is unreadable: $filePath. Falling back to other sources.")
+                            when {
+                                readableFile != null -> {
+                                    Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
+                                    android.net.Uri.fromFile(readableFile).toString()
+                                }
+                                cachedFile != null -> {
+                                    Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
+                                    android.net.Uri.fromFile(cachedFile).toString()
+                                }
+                                else -> {
+                                    val dlUrl = song.highQualityDownloadUrl
+                                    Log.d(TAG, "Using high quality download URL: $dlUrl")
+                                    dlUrl ?: ""
+                                }
+                            }
+                        }
+                    }
+                    readableFile != null -> {
+                        Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
+                        android.net.Uri.fromFile(readableFile).toString()
+                    }
+                    cachedFile != null -> {
+                        Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
+                        android.net.Uri.fromFile(cachedFile).toString()
+                    }
+                    else -> {
+                        val dlUrl = song.highQualityDownloadUrl
+                        Log.d(TAG, "Using high quality download URL: $dlUrl")
+                        dlUrl ?: ""
+                    }
+                }
+
+                localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
+                artworkUri = if (localArtworkFile != null) {
+                    Log.d(TAG, "Using cached artwork: ${localArtworkFile.absolutePath}")
+                    android.net.Uri.fromFile(localArtworkFile)
+                } else {
+                    song.highQualityImageUrl?.let {
+                        Log.d(TAG, "Using network artwork URL: $it")
+                        it.toUri()
+                    }
+                }
+
+                // Reset saved position so the new song always starts from the beginning.
+                try {
+                    context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                        .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to reset seek position", e)
+                }
+
+                streamingCacheManager.cleanTempFiles()
+            }
+
+            // Bail out if we couldn't resolve a playable URI
+            if (resolvedUri.isEmpty()) {
+                Log.w(TAG, "playSong: could not resolve a playable URI for '${song.name}'")
+                _playbackState.value = PlaybackState(currentSong = song, isPlaying = false, isBuffering = false)
+                return@launch
+            }
+
+            cachingJob?.cancel()
+            if (readableFile == null && cachedFile == null) {
+                cachingJob = scope.launch {
+                    Log.d(TAG, "Triggering background caching for song '${song.name}'")
+                    streamingCacheManager.cacheSong(song)
+                }
+            }
+
+            // Start playback immediately with URI-only metadata.
+            // Artwork is fetched asynchronously and patched in afterward so that
+            // playback is never blocked — especially important when the screen is off
+            // and Coil's image pipeline may stall or be throttled by the OS.
+            val metadata = MediaMetadata.Builder()
+                .setTitle(song.name)
+                .setArtist(song.primaryArtistNames)
+                .setAlbumTitle(song.album.name)
+                .setArtworkUri(artworkUri)
+                .build()
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(resolvedUri)
+                .setMediaMetadata(metadata)
+                .build()
+
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.play()
+            Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
+
+            // Fetch artwork in background and patch metadata once available
             val artworkBitmap = withContext(Dispatchers.IO) {
                 try {
                     when {
