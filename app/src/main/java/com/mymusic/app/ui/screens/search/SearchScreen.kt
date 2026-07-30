@@ -48,6 +48,7 @@ import com.mymusic.app.ui.components.SongListItem
 import com.mymusic.app.ui.screens.player.PlayerViewModel
 import com.mymusic.app.ui.screens.home.PlaylistSheetContent
 import com.mymusic.app.ui.screens.home.AlbumSheetContent
+import com.mymusic.app.ui.screens.home.ArtistSheetContent
 
 enum class SearchCategory {
     SONGS, ALBUMS, ARTISTS, PLAYLISTS
@@ -383,107 +384,21 @@ fun SearchScreen(
     if (uiState.selectedArtistDetail != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.clearSelectedArtist() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f),
+            dragHandle = null
         ) {
-            val artistDetail = uiState.selectedArtistDetail!!
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = artistDetail.mediumQualityImageUrl,
-                        contentDescription = artistDetail.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = artistDetail.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        val followerCount = artistDetail.followerCount ?: artistDetail.fanCount
-                        if (followerCount != null) {
-                            Text(
-                                text = "${formatCount(followerCount)} Followers",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            ArtistSheetContent(
+                artistDetail = uiState.selectedArtistDetail!!,
+                playerViewModel = playerViewModel,
+                onPlaySong = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    viewModel.clearSelectedArtist()
+                    onPlaySong()
                 }
-
-                HorizontalDivider()
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Top Songs",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-
-                val topSongs = artistDetail.topSongs ?: emptyList()
-                if (topSongs.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No songs found.")
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(if (isTablet) 2 else 1),
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = 24.dp)
-                    ) {
-                        itemsIndexed(
-                            items = topSongs,
-                            key = { _, song -> song.id }
-                        ) { index, song ->
-                            val isDownloading = downloadStates[song.id]?.isDownloading == true
-                            val isDownloaded = remember(downloadedSongs, downloadStates[song.id]?.isComplete, song.id) { playerViewModel.isSongDownloaded(song) }
-                            val isPlaying = currentPlayingSongId == song.id
-                            
-                            val onClick = remember(topSongs, index) {
-                                {
-                                    focusManager.clearFocus()
-                                    keyboardController?.hide()
-                                    playerViewModel.playSongFromList(topSongs, index)
-                                    viewModel.clearSelectedArtist()
-                                    onPlaySong()
-                                }
-                            }
-                            val onDownloadClick = remember(song) {
-                                { playerViewModel.downloadSong(song) }
-                            }
-
-                            SongListItem(
-                                song = song,
-                                onClick = onClick,
-                                onDownloadClick = onDownloadClick,
-                                isDownloaded = isDownloaded,
-                                isDownloading = isDownloading,
-                                isPlaying = isPlaying,
-                                downloadProgress = downloadStates[song.id]?.progress
-                            )
-                        }
-                    }
-                }
-            }
+            )
         }
     }
 
@@ -523,15 +438,5 @@ fun SearchScreen(
                 }
             )
         }
-    }
-}
-
-private fun formatCount(count: Int): String {
-    return if (count >= 1_000_000) {
-        "%.1fM".format(count / 1_000_000f)
-    } else if (count >= 1_000) {
-        "%.1fK".format(count / 1_000f)
-    } else {
-        count.toString()
     }
 }

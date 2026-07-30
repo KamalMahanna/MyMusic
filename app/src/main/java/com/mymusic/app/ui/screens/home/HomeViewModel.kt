@@ -4,12 +4,14 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mymusic.app.data.model.Album
+import com.mymusic.app.data.model.ArtistDetail
 import com.mymusic.app.data.model.ModuleItem
 import com.mymusic.app.data.model.ModuleSection
 import com.mymusic.app.data.model.Playlist
 import com.mymusic.app.data.model.Song
 import com.mymusic.app.data.repository.MusicRepository
 import com.mymusic.app.player.MusicPlayerManager
+import com.mymusic.app.utils.SongDeduplicator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +24,8 @@ data class HomeUiState(
     val sections: List<ModuleSection> = emptyList(),
     val error: String? = null,
     val selectedPlaylist: Playlist? = null,
-    val selectedAlbum: Album? = null
+    val selectedAlbum: Album? = null,
+    val selectedArtistDetail: ArtistDetail? = null
 )
 
 @HiltViewModel
@@ -131,6 +134,34 @@ class HomeViewModel @Inject constructor(
                             }
                         }
                     }
+                    "artist" -> {
+                        val placeholderArtist = ArtistDetail(
+                            id = item.id,
+                            name = item.name,
+                            image = item.image,
+                            topSongs = null
+                        )
+                        _uiState.value = _uiState.value.copy(selectedArtistDetail = placeholderArtist)
+
+                        val result = musicRepository.getArtistById(item.id)
+                        result.onSuccess { detail ->
+                            val current = _uiState.value.selectedArtistDetail
+                            if (current != null && current.id == item.id) {
+                                val deduplicatedTopSongs = SongDeduplicator.deduplicate(detail.topSongs)
+                                val cleanDetail = if (detail.topSongs != null) detail.copy(topSongs = deduplicatedTopSongs) else detail
+                                _uiState.value = _uiState.value.copy(selectedArtistDetail = cleanDetail)
+                            }
+                        }.onFailure { e ->
+                            Log.e(TAG, "Failed to load artist", e)
+                            val current = _uiState.value.selectedArtistDetail
+                            if (current != null && current.id == item.id) {
+                                _uiState.value = _uiState.value.copy(
+                                    selectedArtistDetail = null,
+                                    error = "Failed to load artist: ${e.message}"
+                                )
+                            }
+                        }
+                    }
                     else -> {
                         _uiState.value = _uiState.value.copy(error = "Unsupported type: ${item.type}")
                     }
@@ -148,6 +179,10 @@ class HomeViewModel @Inject constructor(
 
     fun clearSelectedAlbum() {
         _uiState.value = _uiState.value.copy(selectedAlbum = null)
+    }
+
+    fun clearSelectedArtist() {
+        _uiState.value = _uiState.value.copy(selectedArtistDetail = null)
     }
 
     companion object {
