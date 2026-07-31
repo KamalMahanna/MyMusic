@@ -136,13 +136,44 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun getArtistById(id: String): Result<ArtistDetail> = withContext(Dispatchers.IO) {
+    private val playlistCache = java.util.Collections.synchronizedMap(
+        object : java.util.LinkedHashMap<String, Playlist>(50, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Playlist>?): Boolean = size > 50
+        }
+    )
+
+    private val albumCache = java.util.Collections.synchronizedMap(
+        object : java.util.LinkedHashMap<String, Album>(50, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Album>?): Boolean = size > 50
+        }
+    )
+
+    private val artistCache = java.util.Collections.synchronizedMap(
+        object : java.util.LinkedHashMap<String, ArtistDetail>(50, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ArtistDetail>?): Boolean = size > 50
+        }
+    )
+
+    fun getCachedPlaylist(id: String): Playlist? = playlistCache[id]
+    fun getCachedAlbum(id: String): Album? = albumCache[id]
+    fun getCachedArtist(id: String): ArtistDetail? = artistCache[id]
+
+    suspend fun getArtistById(id: String, forceRefresh: Boolean = false): Result<ArtistDetail> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            val cached = artistCache[id]
+            if (cached != null) {
+                Log.d(TAG, "getArtistById cache hit for '${cached.name}'")
+                return@withContext Result.success(cached)
+            }
+        }
         Log.d(TAG, "getArtistById(id='$id')")
         try {
             val response = runWithRetry { api.getArtistById(id) }
             if (response.success && response.data != null) {
-                Log.d(TAG, "getArtistById success: loaded artist='${response.data.name}'")
-                Result.success(response.data.clean())
+                val cleanData = response.data.clean()
+                artistCache[id] = cleanData
+                Log.d(TAG, "getArtistById success: loaded artist='${cleanData.name}'")
+                Result.success(cleanData)
             } else {
                 Log.e(TAG, "getArtistById failed: success=${response.success}, data is null: ${response.data == null}")
                 Result.failure(Exception("Artist not found"))
@@ -153,13 +184,22 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun getAlbumById(id: String): Result<Album> = withContext(Dispatchers.IO) {
+    suspend fun getAlbumById(id: String, forceRefresh: Boolean = false): Result<Album> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            val cached = albumCache[id]
+            if (cached != null) {
+                Log.d(TAG, "getAlbumById cache hit for '${cached.name}'")
+                return@withContext Result.success(cached)
+            }
+        }
         Log.d(TAG, "getAlbumById(id='$id')")
         try {
             val response = runWithRetry { api.getAlbumById(id) }
             if (response.success && response.data != null) {
-                Log.d(TAG, "getAlbumById success: loaded album='${response.data.name}'")
-                Result.success(response.data.clean())
+                val cleanData = response.data.clean()
+                albumCache[id] = cleanData
+                Log.d(TAG, "getAlbumById success: loaded album='${cleanData.name}'")
+                Result.success(cleanData)
             } else {
                 Log.e(TAG, "getAlbumById failed: success=${response.success}, data is null: ${response.data == null}")
                 Result.failure(Exception("Album not found"))
@@ -170,13 +210,22 @@ class MusicRepository @Inject constructor(
         }
     }
 
-    suspend fun getPlaylistById(id: String, limit: Int = 1000): Result<Playlist> = withContext(Dispatchers.IO) {
+    suspend fun getPlaylistById(id: String, limit: Int = 1000, forceRefresh: Boolean = false): Result<Playlist> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            val cached = playlistCache[id]
+            if (cached != null) {
+                Log.d(TAG, "getPlaylistById cache hit for '${cached.name}'")
+                return@withContext Result.success(cached)
+            }
+        }
         Log.d(TAG, "getPlaylistById(id='$id', limit=$limit)")
         try {
             val response = runWithRetry { api.getPlaylistById(id, limit = limit) }
             if (response.success && response.data != null) {
-                Log.d(TAG, "getPlaylistById success: loaded playlist='${response.data.name}', songs=${response.data.songs?.size ?: 0}")
-                Result.success(response.data.clean())
+                val cleanData = response.data.clean()
+                playlistCache[id] = cleanData
+                Log.d(TAG, "getPlaylistById success: loaded playlist='${cleanData.name}', songs=${cleanData.songs?.size ?: 0}")
+                Result.success(cleanData)
             } else {
                 Log.e(TAG, "getPlaylistById failed: success=${response.success}, data is null: ${response.data == null}")
                 Result.failure(Exception("Playlist not found"))

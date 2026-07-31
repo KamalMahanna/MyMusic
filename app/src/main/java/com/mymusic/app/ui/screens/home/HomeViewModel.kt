@@ -83,13 +83,14 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     "playlist", "channel" -> {
-                        val placeholderPlaylist = Playlist(
+                        val cached = musicRepository.getCachedPlaylist(item.id)
+                        val initialPlaylist = cached ?: Playlist(
                             id = item.id,
                             name = item.name,
                             image = item.image,
                             songs = null
                         )
-                        _uiState.value = _uiState.value.copy(selectedPlaylist = placeholderPlaylist)
+                        _uiState.value = _uiState.value.copy(selectedPlaylist = initialPlaylist)
 
                         val result = musicRepository.getPlaylistById(item.id)
                         result.onSuccess { playlist ->
@@ -100,7 +101,7 @@ class HomeViewModel @Inject constructor(
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load playlist", e)
                             val current = _uiState.value.selectedPlaylist
-                            if (current != null && current.id == item.id) {
+                            if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedPlaylist = null,
                                     error = "Failed to load playlist: ${e.message}"
@@ -109,13 +110,14 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     "album" -> {
-                        val placeholderAlbum = Album(
+                        val cached = musicRepository.getCachedAlbum(item.id)
+                        val initialAlbum = cached ?: Album(
                             id = item.id,
                             name = item.name,
                             image = item.image,
                             songs = null
                         )
-                        _uiState.value = _uiState.value.copy(selectedAlbum = placeholderAlbum)
+                        _uiState.value = _uiState.value.copy(selectedAlbum = initialAlbum)
 
                         val result = musicRepository.getAlbumById(item.id)
                         result.onSuccess { album ->
@@ -126,7 +128,7 @@ class HomeViewModel @Inject constructor(
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load album", e)
                             val current = _uiState.value.selectedAlbum
-                            if (current != null && current.id == item.id) {
+                            if (current != null && current.id == item.id && current.songs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedAlbum = null,
                                     error = "Failed to load album: ${e.message}"
@@ -135,13 +137,14 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     "artist" -> {
-                        val placeholderArtist = ArtistDetail(
+                        val cached = musicRepository.getCachedArtist(item.id)
+                        val initialArtist = cached ?: ArtistDetail(
                             id = item.id,
                             name = item.name,
                             image = item.image,
                             topSongs = null
                         )
-                        _uiState.value = _uiState.value.copy(selectedArtistDetail = placeholderArtist)
+                        _uiState.value = _uiState.value.copy(selectedArtistDetail = initialArtist)
 
                         val result = musicRepository.getArtistById(item.id)
                         result.onSuccess { detail ->
@@ -154,7 +157,7 @@ class HomeViewModel @Inject constructor(
                         }.onFailure { e ->
                             Log.e(TAG, "Failed to load artist", e)
                             val current = _uiState.value.selectedArtistDetail
-                            if (current != null && current.id == item.id) {
+                            if (current != null && current.id == item.id && current.topSongs == null) {
                                 _uiState.value = _uiState.value.copy(
                                     selectedArtistDetail = null,
                                     error = "Failed to load artist: ${e.message}"

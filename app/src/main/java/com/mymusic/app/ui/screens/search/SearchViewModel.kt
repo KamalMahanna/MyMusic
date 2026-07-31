@@ -111,7 +111,14 @@ class SearchViewModel @Inject constructor(
     }
 
     fun selectArtist(artistId: String) {
-        _uiState.value = _uiState.value.copy(isArtistDetailLoading = true, selectedArtistDetail = null)
+        val cached = musicRepository.getCachedArtist(artistId)
+        if (cached != null) {
+            val deduplicatedTopSongs = SongDeduplicator.deduplicate(cached.topSongs)
+            val cleanDetail = if (cached.topSongs != null) cached.copy(topSongs = deduplicatedTopSongs) else cached
+            _uiState.value = _uiState.value.copy(isArtistDetailLoading = false, selectedArtistDetail = cleanDetail)
+        } else {
+            _uiState.value = _uiState.value.copy(isArtistDetailLoading = true, selectedArtistDetail = null)
+        }
         viewModelScope.launch {
             musicRepository.getArtistById(artistId)
                 .onSuccess { detail ->
@@ -123,16 +130,25 @@ class SearchViewModel @Inject constructor(
                     )
                 }
                 .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isArtistDetailLoading = false,
-                        error = e.message
-                    )
+                    if (_uiState.value.selectedArtistDetail == null) {
+                        _uiState.value = _uiState.value.copy(
+                            isArtistDetailLoading = false,
+                            error = e.message
+                        )
+                    }
                 }
         }
     }
 
     fun selectPlaylist(playlistId: String) {
-        _uiState.value = _uiState.value.copy(isPlaylistDetailLoading = true, selectedPlaylist = null)
+        val cached = musicRepository.getCachedPlaylist(playlistId)
+        if (cached != null) {
+            val deduplicatedSongs = SongDeduplicator.deduplicate(cached.songs)
+            val cleanDetail = if (cached.songs != null) cached.copy(songs = deduplicatedSongs) else cached
+            _uiState.value = _uiState.value.copy(isPlaylistDetailLoading = false, selectedPlaylist = cleanDetail)
+        } else {
+            _uiState.value = _uiState.value.copy(isPlaylistDetailLoading = true, selectedPlaylist = null)
+        }
         viewModelScope.launch {
             musicRepository.getPlaylistById(playlistId)
                 .onSuccess { detail ->
@@ -144,16 +160,25 @@ class SearchViewModel @Inject constructor(
                     )
                 }
                 .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isPlaylistDetailLoading = false,
-                        error = e.message
-                    )
+                    if (_uiState.value.selectedPlaylist == null) {
+                        _uiState.value = _uiState.value.copy(
+                            isPlaylistDetailLoading = false,
+                            error = e.message
+                        )
+                    }
                 }
         }
     }
 
     fun selectAlbum(albumId: String) {
-        _uiState.value = _uiState.value.copy(isAlbumDetailLoading = true, selectedAlbum = null)
+        val cached = musicRepository.getCachedAlbum(albumId)
+        if (cached != null) {
+            val deduplicatedSongs = SongDeduplicator.deduplicate(cached.songs)
+            val cleanDetail = if (cached.songs != null) cached.copy(songs = deduplicatedSongs) else cached
+            _uiState.value = _uiState.value.copy(isAlbumDetailLoading = false, selectedAlbum = cleanDetail)
+        } else {
+            _uiState.value = _uiState.value.copy(isAlbumDetailLoading = true, selectedAlbum = null)
+        }
         viewModelScope.launch {
             musicRepository.getAlbumById(albumId)
                 .onSuccess { detail ->
@@ -165,10 +190,12 @@ class SearchViewModel @Inject constructor(
                     )
                 }
                 .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isAlbumDetailLoading = false,
-                        error = e.message
-                    )
+                    if (_uiState.value.selectedAlbum == null) {
+                        _uiState.value = _uiState.value.copy(
+                            isAlbumDetailLoading = false,
+                            error = e.message
+                        )
+                    }
                 }
         }
     }
