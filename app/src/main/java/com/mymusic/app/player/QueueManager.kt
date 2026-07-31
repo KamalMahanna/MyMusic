@@ -53,6 +53,13 @@ class QueueManager @Inject constructor(
             return if (idx in q.indices) q[idx] else null
         }
 
+    val nextSong: Song?
+        get() {
+            val nextIdx = _currentIndex.value + 1
+            val q = _queue.value
+            return if (nextIdx in q.indices) q[nextIdx] else null
+        }
+
     init {
         restoreState()
     }

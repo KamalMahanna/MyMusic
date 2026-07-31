@@ -42,8 +42,17 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun loadModules() {
-        viewModelScope.launch {
+        val cached = musicRepository.getCachedModules()
+        if (cached != null) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                sections = cached.sortedBy { it.position },
+                error = null
+            )
+        } else {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        }
+        viewModelScope.launch {
             val result = musicRepository.getModules()
             result.onSuccess { sections ->
                 _uiState.value = _uiState.value.copy(
@@ -51,10 +60,12 @@ class HomeViewModel @Inject constructor(
                     sections = sections.sortedBy { it.position }
                 )
             }.onFailure { e ->
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message
-                )
+                if (_uiState.value.sections.isEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message
+                    )
+                }
             }
         }
     }

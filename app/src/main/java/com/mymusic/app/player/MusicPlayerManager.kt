@@ -281,10 +281,15 @@ class MusicPlayerManager @Inject constructor(
             }
 
             cachingJob?.cancel()
-            if (readableFile == null && cachedFile == null) {
-                cachingJob = scope.launch {
+            cachingJob = scope.launch {
+                if (readableFile == null && cachedFile == null) {
                     Log.d(TAG, "Triggering background caching for song '${song.name}'")
                     streamingCacheManager.cacheSong(song)
+                }
+                val upcomingSong = queueManager.nextSong
+                if (upcomingSong != null) {
+                    Log.d(TAG, "Pre-caching next song in queue '${upcomingSong.name}'")
+                    streamingCacheManager.cacheSong(upcomingSong)
                 }
             }
 
