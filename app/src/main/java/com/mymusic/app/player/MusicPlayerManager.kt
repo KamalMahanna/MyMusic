@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
@@ -54,6 +55,19 @@ class MusicPlayerManager @Inject constructor(
     private var audioDeviceCallback: android.media.AudioDeviceCallback? = null
     private var cachingJob: Job? = null
 
+    /**
+     * Partial wake lock held during song transitions (STATE_ENDED → next song STATE_READY).
+     * ExoPlayer's WAKE_MODE_NETWORK only keeps the CPU awake while actively playing;
+     * this covers the gap where we resolve URLs, cache, and prepare the next track.
+     * 60-second timeout prevents battery drain if something goes wrong.
+     */
+    private val transitionWakeLock: PowerManager.WakeLock by lazy {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyMusic::SongTransition").apply {
+            setReferenceCounted(false)
+        }
+    }
+
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
@@ -99,9 +113,11 @@ class MusicPlayerManager @Inject constructor(
                                     isBuffering = false,
                                     duration = player.duration.coerceAtLeast(0)
                                 )
+                                releaseTransitionWakeLock()
                             }
                             Player.STATE_ENDED -> {
-                                Log.d(TAG, "Playback ended, playing next song")
+                                Log.d(TAG, "Playback ended, acquiring wake lock for next-song transition")
+                                acquireTransitionWakeLock()
                                 scope.launch { playNext() }
                             }
                             Player.STATE_IDLE -> {}
@@ -180,6 +196,7 @@ class MusicPlayerManager @Inject constructor(
             queueManager.setQueue(listOf(song), 0)
         }
         val player = getOrCreatePlayer()
+        acquireTransitionWakeLock()
         
         try {
             Log.d(TAG, "Starting MusicService")
@@ -277,6 +294,7 @@ class MusicPlayerManager @Inject constructor(
             if (resolvedUri.isEmpty()) {
                 Log.w(TAG, "playSong: could not resolve a playable URI for '${song.name}'")
                 _playbackState.value = PlaybackState(currentSong = song, isPlaying = false, isBuffering = false)
+                releaseTransitionWakeLock()
                 return@launch
             }
 
@@ -534,6 +552,7 @@ class MusicPlayerManager @Inject constructor(
 
     fun release() {
         Log.d(TAG, "release() invoked")
+        releaseTransitionWakeLock()
         stopProgressUpdate()
         cachingJob?.cancel()
         scope.cancel()
@@ -704,6 +723,28 @@ class MusicPlayerManager @Inject constructor(
                     Log.d(TAG, "restoreLastPlayedSong: ExoPlayer prepared at pos=$savedPos")
                 }
             }
+        }
+    }
+
+    private fun acquireTransitionWakeLock() {
+        try {
+            if (!transitionWakeLock.isHeld) {
+                transitionWakeLock.acquire(60_000L) // 60s timeout safety net
+                Log.d(TAG, "Transition wake lock acquired")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire transition wake lock: ${e.message}", e)
+        }
+    }
+
+    private fun releaseTransitionWakeLock() {
+        try {
+            if (transitionWakeLock.isHeld) {
+                transitionWakeLock.release()
+                Log.d(TAG, "Transition wake lock released")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release transition wake lock: ${e.message}", e)
         }
     }
 
