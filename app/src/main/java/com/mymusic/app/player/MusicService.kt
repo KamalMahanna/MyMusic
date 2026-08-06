@@ -134,11 +134,10 @@ class MusicService : MediaLibraryService() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d(TAG, "onTaskRemoved() called. App swiped away from recent tasks.")
         val player = mediaSession?.player
-        if (player != null && player.playWhenReady && player.mediaItemCount > 0) {
-            // Pause playback but keep the service alive so System UI can still
-            // show the media resumption card in the notification shade.
-            Log.d(TAG, "Pausing playback but keeping service alive for media resumption")
-            player.pause()
+        if (player != null && (player.playWhenReady || player.isPlaying) && player.mediaItemCount > 0) {
+            // User swiped the app but music is playing — keep the service alive
+            // so playback continues uninterrupted in the background.
+            Log.d(TAG, "Active playback detected, keeping service alive")
         } else {
             // Nothing playing — safe to tear down the service entirely.
             Log.d(TAG, "No active playback, stopping service")

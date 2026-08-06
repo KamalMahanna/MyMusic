@@ -59,7 +59,7 @@ class MusicPlayerManager @Inject constructor(
      * Partial wake lock held during song transitions (STATE_ENDED → next song STATE_READY).
      * ExoPlayer's WAKE_MODE_NETWORK only keeps the CPU awake while actively playing;
      * this covers the gap where we resolve URLs, cache, and prepare the next track.
-     * 60-second timeout prevents battery drain if something goes wrong.
+     * 120-second timeout prevents battery drain if something goes wrong.
      */
     private val transitionWakeLock: PowerManager.WakeLock by lazy {
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -118,7 +118,14 @@ class MusicPlayerManager @Inject constructor(
                             Player.STATE_ENDED -> {
                                 Log.d(TAG, "Playback ended, acquiring wake lock for next-song transition")
                                 acquireTransitionWakeLock()
-                                scope.launch { playNext() }
+                                scope.launch {
+                                    try {
+                                        playNext()
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Failed to play next song after STATE_ENDED: ${e.message}", e)
+                                        releaseTransitionWakeLock()
+                                    }
+                                }
                             }
                             Player.STATE_IDLE -> {}
                         }
@@ -332,28 +339,30 @@ class MusicPlayerManager @Inject constructor(
             player.play()
             Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
 
-            // Fetch artwork in background and patch metadata once available
-            val artworkBitmap = withContext(Dispatchers.IO) {
+            // Fire-and-forget: fetch artwork in a SEPARATE coroutine so that
+            // Coil stalls, timeouts, or failures when the screen is off can
+            // never interrupt active playback.
+            scope.launch {
                 try {
-                    when {
-                        localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
-                        song.highQualityImageUrl != null -> {
-                            val request = ImageRequest.Builder(context)
-                                .data(song.highQualityImageUrl)
-                                .allowHardware(false)
-                                .build()
-                            (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
+                    val artworkBitmap = withContext(Dispatchers.IO) {
+                        when {
+                            localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
+                            song.highQualityImageUrl != null -> {
+                                val request = ImageRequest.Builder(context)
+                                    .data(song.highQualityImageUrl)
+                                    .allowHardware(false)
+                                    .build()
+                                (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
+                            }
+                            else -> null
                         }
-                        else -> null
+                    }
+                    if (artworkBitmap != null && _playbackState.value.currentSong?.id == song.id) {
+                        updateArtworkMetadata(player, artworkBitmap, song)
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Artwork fetch failed for '${song.name}': ${e.message}")
-                    null
                 }
-            }
-
-            if (artworkBitmap != null && _playbackState.value.currentSong?.id == song.id) {
-                updateArtworkMetadata(player, artworkBitmap, song)
             }
 
             // Check if we need more suggestions
@@ -729,7 +738,7 @@ class MusicPlayerManager @Inject constructor(
     private fun acquireTransitionWakeLock() {
         try {
             if (!transitionWakeLock.isHeld) {
-                transitionWakeLock.acquire(60_000L) // 60s timeout safety net
+                transitionWakeLock.acquire(120_000L) // 120s timeout safety net
                 Log.d(TAG, "Transition wake lock acquired")
             }
         } catch (e: Exception) {
