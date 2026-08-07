@@ -156,6 +156,15 @@ class MusicPlayerManager @Inject constructor(
                             Log.d(TAG, "Headphones/Bluetooth detected as added. player.mediaItemCount=${player.mediaItemCount}, player.isPlaying=${player.isPlaying}")
                             if (player.mediaItemCount > 0 && !player.isPlaying) {
                                 Log.d(TAG, "Resuming playback due to audio device addition")
+                                try {
+                                    val serviceIntent = Intent(context, MusicService::class.java)
+                                    ContextCompat.startForegroundService(context, serviceIntent)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to start MusicService on audio device addition: ${e.message}", e)
+                                }
+                                if (player.playbackState == Player.STATE_IDLE) {
+                                    player.prepare()
+                                }
                                 player.play()
                             }
                         }
@@ -327,9 +336,12 @@ class MusicPlayerManager @Inject constructor(
                 .setArtist(song.primaryArtistNames)
                 .setAlbumTitle(song.album.name)
                 .setArtworkUri(artworkUri)
+                .setIsPlayable(true)
+                .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
                 .build()
 
             val mediaItem = MediaItem.Builder()
+                .setMediaId(song.id)
                 .setUri(resolvedUri)
                 .setMediaMetadata(metadata)
                 .build()
