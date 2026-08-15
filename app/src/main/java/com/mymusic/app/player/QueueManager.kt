@@ -3,6 +3,7 @@ package com.mymusic.app.player
 import android.content.Context
 import android.util.Log
 import com.mymusic.app.data.model.Song
+import com.mymusic.app.data.repository.DownloadRepository
 import com.mymusic.app.data.repository.MusicRepository
 import com.mymusic.app.utils.SongDeduplicator
 import com.squareup.moshi.Moshi
@@ -20,6 +21,7 @@ import javax.inject.Singleton
 @Singleton
 class QueueManager @Inject constructor(
     private val musicRepository: MusicRepository,
+    private val downloadRepository: DownloadRepository,
     private val moshi: Moshi,
     @ApplicationContext private val context: Context
 ) {
@@ -31,6 +33,10 @@ class QueueManager @Inject constructor(
 
     private val _isShuffleEnabled = MutableStateFlow(false)
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+
+    var onQueueAppended: ((List<Song>) -> Unit)? = null
+    var onQueueReset: ((List<Song>, Int) -> Unit)? = null
+    var onQueueRemoved: ((Int) -> Unit)? = null
 
     private var originalQueue = emptyList<Song>()
 
@@ -119,7 +125,9 @@ class QueueManager @Inject constructor(
     }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0) {
-        val isDownloaded = songs.isNotEmpty() && songs.first().url.let { it.startsWith("/") || it.startsWith("file:") }
+        val isDownloaded = songs.isNotEmpty() && songs.any {
+            it.url.startsWith("/") || it.url.startsWith("file:") || downloadRepository.isSongDownloaded(it)
+        }
         if (isDownloaded) {
             setDownloadedQueue(songs, startIndex)
             return
@@ -161,6 +169,7 @@ class QueueManager @Inject constructor(
         _currentIndex.value = if (newIndex != -1) newIndex else startIndex.coerceIn(-1, finalQueue.size - 1)
         Log.d(TAG, "setQueue: new index=${_currentIndex.value}, song='${currentSong?.name}'")
         saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun setDownloadedQueue(songs: List<Song>, startIndex: Int = 0) {
@@ -199,6 +208,7 @@ class QueueManager @Inject constructor(
 
         Log.d(TAG, "setDownloadedQueue initialized: active queue size=${initialBatch.size}, targetSong='${targetSong.name}', nextIndex=$downloadedSourceNextIndex")
         saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun addToQueue(songs: List<Song>) {
@@ -250,6 +260,7 @@ class QueueManager @Inject constructor(
             }
             Log.d(TAG, "addToQueue (bulk): new total queue size=${_queue.value.size}")
             saveState()
+            onQueueAppended?.invoke(uniqueIncoming)
         }
     }
 
@@ -322,6 +333,8 @@ class QueueManager @Inject constructor(
             isLoadingSuggestions = true
             try {
                 loadMoreDownloadedSongs()
+            } catch (e: Exception) {
+                Log.e(TAG, "loadMoreSuggestions: error in loadMoreDownloadedSongs: ${e.message}", e)
             } finally {
                 isLoadingSuggestions = false
             }
@@ -341,8 +354,10 @@ class QueueManager @Inject constructor(
                 Log.d(TAG, "loadMoreSuggestions: successfully retrieved ${suggestions.size} suggestions")
                 addToQueue(suggestions)
             }.onFailure { exception ->
-                Log.e(TAG, "loadMoreSuggestions: failed to fetch suggestions", exception)
+                Log.e(TAG, "loadMoreSuggestions: failed to fetch suggestions: ${exception.message}")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "loadMoreSuggestions: error fetching suggestions: ${e.message}")
         } finally {
             isLoadingSuggestions = false
         }
@@ -403,6 +418,7 @@ class QueueManager @Inject constructor(
         _currentIndex.value = updatedIndex
         originalQueue = if (_isShuffleEnabled.value) originalQueue + batch else updatedQueue
         saveState()
+        onQueueAppended?.invoke(batch)
     }
 
     fun toggleShuffle() {
@@ -428,6 +444,7 @@ class QueueManager @Inject constructor(
             _queue.value = initialBatch
             _currentIndex.value = if (current != null) initialBatch.indexOfFirst { it.id == current.id }.coerceAtLeast(0) else 0
             saveState()
+            onQueueReset?.invoke(_queue.value, _currentIndex.value)
             return
         }
 
@@ -455,6 +472,7 @@ class QueueManager @Inject constructor(
             Log.d(TAG, "toggleShuffle: disabled, queue size=${_queue.value.size}")
         }
         saveState()
+        onQueueReset?.invoke(_queue.value, _currentIndex.value)
     }
 
     fun clear() {
@@ -467,6 +485,7 @@ class QueueManager @Inject constructor(
         playedSongIds.clear()
         playedKeys.clear()
         saveState()
+        onQueueReset?.invoke(emptyList(), -1)
     }
 
     fun removeAt(index: Int) {
@@ -490,6 +509,7 @@ class QueueManager @Inject constructor(
                 Log.d(TAG, "removeAt: removed current song, index remains ${_currentIndex.value}")
             }
             saveState()
+            onQueueRemoved?.invoke(index)
         } else {
             Log.w(TAG, "removeAt: index out of bounds")
         }

@@ -2,35 +2,29 @@ package com.mymusic.app.player
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.mymusic.app.data.model.Song
-import androidx.media3.common.ForwardingPlayer
 import com.mymusic.app.data.repository.DownloadRepository
-import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-import coil3.imageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.request.allowHardware
-import coil3.toBitmap
 
 data class PlaybackState(
     val currentSong: Song? = null,
@@ -56,10 +50,9 @@ class MusicPlayerManager @Inject constructor(
     private var cachingJob: Job? = null
 
     /**
-     * Partial wake lock held during song transitions (STATE_ENDED → next song STATE_READY).
-     * ExoPlayer's WAKE_MODE_NETWORK only keeps the CPU awake while actively playing;
-     * this covers the gap where we resolve URLs, cache, and prepare the next track.
-     * 120-second timeout prevents battery drain if something goes wrong.
+     * Partial wake lock held during song transitions.
+     * ExoPlayer's WAKE_MODE_NETWORK keeps the CPU awake while actively playing;
+     * this covers any background edge-cases during queue synchronization.
      */
     private val transitionWakeLock: PowerManager.WakeLock by lazy {
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -70,6 +63,40 @@ class MusicPlayerManager @Inject constructor(
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+
+    init {
+        queueManager.onQueueAppended = { newSongs ->
+            val player = exoPlayer
+            if (player != null && newSongs.isNotEmpty()) {
+                val newMediaItems = newSongs.map { buildMediaItem(it) }
+                player.addMediaItems(newMediaItems)
+                Log.d(TAG, "QueueManager onQueueAppended: Appended ${newMediaItems.size} items to ExoPlayer timeline")
+            }
+        }
+        queueManager.onQueueReset = { newQueue, newIndex ->
+            val player = exoPlayer
+            if (player != null) {
+                val isPlaying = player.isPlaying
+                val currentPos = player.currentPosition
+                if (newQueue.isEmpty()) {
+                    player.clearMediaItems()
+                } else {
+                    val mediaItems = newQueue.map { buildMediaItem(it) }
+                    val safeIndex = if (newIndex in mediaItems.indices) newIndex else 0
+                    player.setMediaItems(mediaItems, safeIndex, if (safeIndex == newIndex) currentPos else 0L)
+                    if (isPlaying) {
+                        player.play()
+                    }
+                }
+            }
+        }
+        queueManager.onQueueRemoved = { index ->
+            val player = exoPlayer
+            if (player != null && index in 0 until player.mediaItemCount) {
+                player.removeMediaItem(index)
+            }
+        }
+    }
 
     fun getPlayer(): Player {
         return getOrCreatePlayer()
@@ -90,10 +117,48 @@ class MusicPlayerManager @Inject constructor(
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-            .also { player ->
+            .also { exo ->
                 Log.d(TAG, "ExoPlayer created and configured")
-                exoPlayer = player
-                player.addListener(object : Player.Listener {
+                exoPlayer = exo
+                exo.addListener(object : Player.Listener {
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        Log.d(TAG, "onMediaItemTransition: mediaId=${mediaItem?.mediaId}, reason=$reason")
+                        val currentMediaId = mediaItem?.mediaId ?: return
+
+                        val currentQueue = queueManager.queue.value
+                        val newIndex = currentQueue.indexOfFirst { it.id == currentMediaId }
+                        if (newIndex != -1) {
+                            queueManager.jumpTo(newIndex)
+                            val song = currentQueue[newIndex]
+                            _playbackState.value = _playbackState.value.copy(
+                                currentSong = song,
+                                isBuffering = false,
+                                duration = exo.duration.coerceAtLeast(0)
+                            )
+
+                            // Reset saved position for the new song
+                            try {
+                                context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                                    .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to reset seek position", e)
+                            }
+
+                            triggerPreCaching()
+
+                            if (queueManager.isNearEnd()) {
+                                Log.d(TAG, "Queue near end on transition, pre-loading suggestions")
+                                scope.launch {
+                                    try {
+                                        queueManager.loadMoreSuggestions()
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Failed to load suggestions on transition: ${e.message}", e)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         val stateString = when (playbackState) {
                             Player.STATE_BUFFERING -> "STATE_BUFFERING"
@@ -111,12 +176,12 @@ class MusicPlayerManager @Inject constructor(
                             Player.STATE_READY -> {
                                 _playbackState.value = _playbackState.value.copy(
                                     isBuffering = false,
-                                    duration = player.duration.coerceAtLeast(0)
+                                    duration = exo.duration.coerceAtLeast(0)
                                 )
                                 releaseTransitionWakeLock()
                             }
                             Player.STATE_ENDED -> {
-                                Log.d(TAG, "Playback ended, acquiring wake lock for next-song transition")
+                                Log.d(TAG, "Playback ended for entire timeline")
                                 acquireTransitionWakeLock()
                                 scope.launch {
                                     try {
@@ -128,6 +193,25 @@ class MusicPlayerManager @Inject constructor(
                                 }
                             }
                             Player.STATE_IDLE -> {}
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.w(TAG, "ExoPlayer error (${error.errorCode}): ${error.message}", error)
+                        if (exo.hasNextMediaItem()) {
+                            Log.d(TAG, "Auto-skipping to next media item due to error")
+                            exo.seekToNextMediaItem()
+                            exo.prepare()
+                            exo.play()
+                        } else {
+                            Log.d(TAG, "No next media item in timeline on error, invoking playNext()")
+                            scope.launch {
+                                try {
+                                    playNext()
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to playNext on player error: ${e.message}", e)
+                                }
+                            }
                         }
                     }
 
@@ -151,10 +235,10 @@ class MusicPlayerManager @Inject constructor(
                             device.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
                             device.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
                         } == true
-                        
+
                         if (hasHeadphones) {
-                            Log.d(TAG, "Headphones/Bluetooth detected as added. player.mediaItemCount=${player.mediaItemCount}, player.isPlaying=${player.isPlaying}")
-                            if (player.mediaItemCount > 0 && !player.isPlaying) {
+                            Log.d(TAG, "Headphones/Bluetooth detected as added. player.mediaItemCount=${exo.mediaItemCount}, player.isPlaying=${exo.isPlaying}")
+                            if (exo.mediaItemCount > 0 && !exo.isPlaying) {
                                 Log.d(TAG, "Resuming playback due to audio device addition")
                                 try {
                                     val serviceIntent = Intent(context, MusicService::class.java)
@@ -162,17 +246,17 @@ class MusicPlayerManager @Inject constructor(
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Failed to start MusicService on audio device addition: ${e.message}", e)
                                 }
-                                if (player.playbackState == Player.STATE_IDLE) {
-                                    player.prepare()
+                                if (exo.playbackState == Player.STATE_IDLE) {
+                                    exo.prepare()
                                 }
-                                player.play()
+                                exo.play()
                             }
                         }
                     }
                 }
                 audioManager.registerAudioDeviceCallback(callback, null)
                 audioDeviceCallback = callback
-                restoreLastPlayedSong(player)
+                restoreLastPlayedSong(exo)
             }
 
         val newForwardingPlayer = object : ForwardingPlayer(newExoPlayer) {
@@ -208,255 +292,22 @@ class MusicPlayerManager @Inject constructor(
     fun playSong(song: Song) {
         Log.d(TAG, "playSong: songId='${song.id}', name='${song.name}', artist='${song.primaryArtistNames}'")
         if (queueManager.currentSong?.id != song.id) {
-            Log.d(TAG, "playSong: queueManager current song mismatch (queue='${queueManager.currentSong?.name}' vs target='${song.name}'). Syncing queue to target song.")
+            Log.d(TAG, "playSong: queueManager current song mismatch. Setting single song queue.")
             queueManager.setQueue(listOf(song), 0)
         }
-        val player = getOrCreatePlayer()
-        acquireTransitionWakeLock()
-        
-        try {
-            Log.d(TAG, "Starting MusicService")
-            val intent = Intent(context, MusicService::class.java)
-            ContextCompat.startForegroundService(context, intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
-        }
-
-        // Show buffering state immediately so the UI responds to the tap
-        _playbackState.value = PlaybackState(
-            currentSong = song,
-            isPlaying = true,
-            isBuffering = true
-        )
-
-        // Move all file I/O off the main thread. ExoPlayer calls (setMediaItem,
-        // prepare, play) are dispatched back to Main once the URI is resolved.
-        scope.launch {
-            val resolvedUri: String
-            val localArtworkFile: java.io.File?
-            val artworkUri: android.net.Uri?
-            val readableFile: java.io.File?
-            val cachedFile: java.io.File?
-
-            withContext(Dispatchers.IO) {
-                readableFile = downloadRepository.getReadableFileForSong(song)
-                cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
-
-                resolvedUri = when {
-                    song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
-                        val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
-                        val customFile = java.io.File(filePath)
-                        if (customFile.exists() && customFile.canRead()) {
-                            Log.d(TAG, "Using file URI directly from song.url: ${song.url}")
-                            if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
-                            else song.url
-                        } else {
-                            Log.w(TAG, "Local file from song.url does not exist or is unreadable: $filePath. Falling back to other sources.")
-                            when {
-                                readableFile != null -> {
-                                    Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
-                                    android.net.Uri.fromFile(readableFile).toString()
-                                }
-                                cachedFile != null -> {
-                                    Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
-                                    android.net.Uri.fromFile(cachedFile).toString()
-                                }
-                                else -> {
-                                    val dlUrl = song.highQualityDownloadUrl
-                                    Log.d(TAG, "Using high quality download URL: $dlUrl")
-                                    dlUrl ?: ""
-                                }
-                            }
-                        }
-                    }
-                    readableFile != null -> {
-                        Log.d(TAG, "Found downloaded song file at ${readableFile.absolutePath}")
-                        android.net.Uri.fromFile(readableFile).toString()
-                    }
-                    cachedFile != null -> {
-                        Log.d(TAG, "Found cached song file at ${cachedFile.absolutePath}")
-                        android.net.Uri.fromFile(cachedFile).toString()
-                    }
-                    else -> {
-                        val dlUrl = song.highQualityDownloadUrl
-                        Log.d(TAG, "Using high quality download URL: $dlUrl")
-                        dlUrl ?: ""
-                    }
-                }
-
-                localArtworkFile = downloadRepository.getCachedArtworkForSong(song)
-                artworkUri = if (localArtworkFile != null) {
-                    Log.d(TAG, "Using cached artwork: ${localArtworkFile.absolutePath}")
-                    android.net.Uri.fromFile(localArtworkFile)
-                } else {
-                    song.highQualityImageUrl?.let {
-                        Log.d(TAG, "Using network artwork URL: $it")
-                        it.toUri()
-                    }
-                }
-
-                // Reset saved position so the new song always starts from the beginning.
-                try {
-                    context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
-                        .edit().putLong("KEY_SEEK_POSITION", 0L).apply()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to reset seek position", e)
-                }
-
-                streamingCacheManager.cleanTempFiles()
-            }
-
-            // Bail out if we couldn't resolve a playable URI
-            if (resolvedUri.isEmpty()) {
-                Log.w(TAG, "playSong: could not resolve a playable URI for '${song.name}'")
-                _playbackState.value = PlaybackState(currentSong = song, isPlaying = false, isBuffering = false)
-                releaseTransitionWakeLock()
-                return@launch
-            }
-
-            cachingJob?.cancel()
-            cachingJob = scope.launch {
-                if (readableFile == null && cachedFile == null) {
-                    Log.d(TAG, "Triggering background caching for song '${song.name}'")
-                    streamingCacheManager.cacheSong(song)
-                }
-                val upcomingSong = queueManager.nextSong
-                if (upcomingSong != null) {
-                    Log.d(TAG, "Pre-caching next song in queue '${upcomingSong.name}'")
-                    streamingCacheManager.cacheSong(upcomingSong)
-                }
-            }
-
-            // Start playback immediately with URI-only metadata.
-            // Artwork is fetched asynchronously and patched in afterward so that
-            // playback is never blocked — especially important when the screen is off
-            // and Coil's image pipeline may stall or be throttled by the OS.
-            val metadata = MediaMetadata.Builder()
-                .setTitle(song.name)
-                .setArtist(song.primaryArtistNames)
-                .setAlbumTitle(song.album.name)
-                .setArtworkUri(artworkUri)
-                .setIsPlayable(true)
-                .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
-                .build()
-
-            val mediaItem = MediaItem.Builder()
-                .setMediaId(song.id)
-                .setUri(resolvedUri)
-                .setMediaMetadata(metadata)
-                .build()
-
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
-            Log.d(TAG, "ExoPlayer: setMediaItem, prepared and play() invoked")
-
-            // Fire-and-forget: fetch artwork in a SEPARATE coroutine so that
-            // Coil stalls, timeouts, or failures when the screen is off can
-            // never interrupt active playback.
-            scope.launch {
-                try {
-                    val artworkBitmap = withContext(Dispatchers.IO) {
-                        when {
-                            localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
-                            song.highQualityImageUrl != null -> {
-                                val request = ImageRequest.Builder(context)
-                                    .data(song.highQualityImageUrl)
-                                    .allowHardware(false)
-                                    .build()
-                                (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
-                            }
-                            else -> null
-                        }
-                    }
-                    if (artworkBitmap != null && _playbackState.value.currentSong?.id == song.id) {
-                        updateArtworkMetadata(player, artworkBitmap, song)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Artwork fetch failed for '${song.name}': ${e.message}")
-                }
-            }
-
-            // Check if we need more suggestions
-            if (queueManager.isNearEnd()) {
-                Log.d(TAG, "Queue is near the end, loading suggestions")
-                queueManager.loadMoreSuggestions()
-            }
-        }
-    }
-
-    /**
-     * Updates the current MediaItem's metadata with the fetched [bitmap] as raw JPEG bytes.
-     * This is required for the system media notification (lock screen / notification shade)
-     * to display album art — it cannot load remote HTTP URLs itself.
-     */
-    private fun updateArtworkMetadata(player: Player, bitmap: Bitmap, song: Song) {
-        try {
-            val currentMediaItem = player.currentMediaItem ?: run {
-                Log.w(TAG, "updateArtworkMetadata: currentMediaItem is null, skipping update for '${song.name}'")
-                return
-            }
-            val currentIndex = player.currentMediaItemIndex
-            if (currentIndex < 0 || currentIndex >= player.mediaItemCount) {
-                Log.w(TAG, "updateArtworkMetadata: index $currentIndex out of bounds (count=${player.mediaItemCount})")
-                return
-            }
-            val bytes = ByteArrayOutputStream().use { stream ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-                stream.toByteArray()
-            }
-            val updatedMetadata = player.mediaMetadata
-                .buildUpon()
-                .setArtworkData(bytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                .build()
-            player.replaceMediaItem(
-                currentIndex,
-                currentMediaItem.buildUpon()
-                    .setMediaMetadata(updatedMetadata)
-                    .build()
-            )
-            Log.d(TAG, "Artwork metadata updated for '${song.name}' (${bytes.size} bytes)")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to update artwork metadata: ${e.message}")
-        }
-    }
-
-    fun setLoadingSong(song: Song) {
-        Log.d(TAG, "setLoadingSong: songId='${song.id}', name='${song.name}'")
-        exoPlayer?.stop()
-        _playbackState.value = PlaybackState(
-            currentSong = song,
-            isPlaying = false,
-            isBuffering = true
-        )
-    }
-
-    fun clearLoadingState(songId: String) {
-        Log.d(TAG, "clearLoadingState: songId='$songId'")
-        if (_playbackState.value.currentSong?.id == songId && _playbackState.value.isBuffering) {
-            _playbackState.value = PlaybackState(
-                currentSong = null,
-                isPlaying = false,
-                isBuffering = false
-            )
-        }
+        syncQueueToPlayer(queueManager.queue.value, queueManager.currentIndex.value)
     }
 
     fun playSongFromQueue(songs: List<Song>, index: Int) {
         Log.d(TAG, "playSongFromQueue: index=$index, size=${songs.size}")
         queueManager.setQueue(songs, index)
-        val song = queueManager.currentSong
-        if (song != null) {
-            playSong(song)
-        } else {
-            Log.w(TAG, "playSongFromQueue: no song found at index $index")
-        }
+        syncQueueToPlayer(queueManager.queue.value, queueManager.currentIndex.value)
     }
 
     fun playSongWithRecommendations(song: Song) {
         Log.d(TAG, "playSongWithRecommendations: songId='${song.id}', name='${song.name}'")
         queueManager.setQueue(listOf(song), 0)
-        playSong(song)
+        syncQueueToPlayer(queueManager.queue.value, 0)
         scope.launch {
             try {
                 queueManager.loadMoreSuggestions()
@@ -466,32 +317,110 @@ class MusicPlayerManager @Inject constructor(
         }
     }
 
+    private fun syncQueueToPlayer(songs: List<Song>, startIndex: Int, seekPosition: Long = 0L) {
+        val player = getOrCreatePlayer()
+        acquireTransitionWakeLock()
 
-    suspend fun playNext() {
-        Log.d(TAG, "playNext() invoked")
+        try {
+            Log.d(TAG, "Starting MusicService")
+            val intent = Intent(context, MusicService::class.java)
+            ContextCompat.startForegroundService(context, intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start MusicService: ${e.message}", e)
+        }
+
+        val safeIndex = startIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0))
+        val currentSong = if (safeIndex in songs.indices) songs[safeIndex] else null
+
+        // Show buffering state immediately so the UI responds to the tap
+        _playbackState.value = PlaybackState(
+            currentSong = currentSong,
+            isPlaying = true,
+            isBuffering = true
+        )
+
+        // Reset saved position so the new song always starts from the beginning (or seekPosition).
+        try {
+            context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+                .edit().putLong("KEY_SEEK_POSITION", seekPosition).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reset seek position", e)
+        }
+
+        streamingCacheManager.cleanTempFiles()
+
+        val mediaItems = songs.map { buildMediaItem(it) }
+        if (mediaItems.isEmpty()) {
+            _playbackState.value = PlaybackState(currentSong = currentSong, isPlaying = false, isBuffering = false)
+            releaseTransitionWakeLock()
+            return
+        }
+
+        player.setMediaItems(mediaItems, safeIndex, seekPosition)
+        player.prepare()
+        player.play()
+        Log.d(TAG, "ExoPlayer: setMediaItems (size=${mediaItems.size}, startIndex=$safeIndex), prepared and play() invoked")
+
+        triggerPreCaching()
+
         if (queueManager.isNearEnd()) {
-            Log.d(TAG, "Queue near end, pre-loading suggestions")
+            Log.d(TAG, "Queue is near the end, loading suggestions")
             scope.launch {
                 try {
                     queueManager.loadMoreSuggestions()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to load suggestions in playNext: ${e.message}", e)
+                    Log.e(TAG, "Failed to load suggestions: ${e.message}", e)
                 }
+            }
+        }
+    }
+
+    suspend fun playNext() {
+        Log.d(TAG, "playNext() invoked")
+        val player = exoPlayer
+        if (player != null && player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
+            if (player.playbackState == Player.STATE_IDLE) {
+                player.prepare()
+            }
+            player.play()
+            return
+        }
+
+        if (queueManager.isNearEnd()) {
+            Log.d(TAG, "Queue near end, pre-loading suggestions")
+            try {
+                queueManager.loadMoreSuggestions()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load suggestions in playNext: ${e.message}", e)
             }
         }
         val nextSong = queueManager.moveToNext()
         Log.d(TAG, "playNext: nextSong='${nextSong?.name}'")
         if (nextSong != null) {
-            playSong(nextSong)
+            syncQueueToPlayer(queueManager.queue.value, queueManager.currentIndex.value)
         }
     }
 
     fun playPrevious() {
         Log.d(TAG, "playPrevious() invoked")
+        val player = exoPlayer
+        if (player != null && player.hasPreviousMediaItem() && player.currentPosition < 3000) {
+            player.seekToPreviousMediaItem()
+            if (player.playbackState == Player.STATE_IDLE) {
+                player.prepare()
+            }
+            player.play()
+            return
+        } else if (player != null && player.currentPosition >= 3000) {
+            player.seekTo(0L)
+            return
+        }
+
         val prevSong = queueManager.moveToPrevious()
         Log.d(TAG, "playPrevious: prevSong='${prevSong?.name}'")
         if (prevSong != null) {
-            playSong(prevSong)
+            syncQueueToPlayer(queueManager.queue.value, queueManager.currentIndex.value)
         }
     }
 
@@ -535,11 +464,42 @@ class MusicPlayerManager @Inject constructor(
 
     fun jumpToQueueIndex(index: Int) {
         Log.d(TAG, "jumpToQueueIndex: index=$index")
-        val song = queueManager.jumpTo(index)
-        if (song != null) {
-            playSong(song)
+        val player = exoPlayer
+        if (player != null && index in 0 until player.mediaItemCount) {
+            queueManager.jumpTo(index)
+            player.seekToDefaultPosition(index)
+            if (player.playbackState == Player.STATE_IDLE) {
+                player.prepare()
+            }
+            player.play()
         } else {
-            Log.w(TAG, "jumpToQueueIndex: no song at index $index")
+            val song = queueManager.jumpTo(index)
+            if (song != null) {
+                syncQueueToPlayer(queueManager.queue.value, index)
+            } else {
+                Log.w(TAG, "jumpToQueueIndex: no song at index $index")
+            }
+        }
+    }
+
+    fun setLoadingSong(song: Song) {
+        Log.d(TAG, "setLoadingSong: songId='${song.id}', name='${song.name}'")
+        exoPlayer?.stop()
+        _playbackState.value = PlaybackState(
+            currentSong = song,
+            isPlaying = false,
+            isBuffering = true
+        )
+    }
+
+    fun clearLoadingState(songId: String) {
+        Log.d(TAG, "clearLoadingState: songId='$songId'")
+        if (_playbackState.value.currentSong?.id == songId && _playbackState.value.isBuffering) {
+            _playbackState.value = PlaybackState(
+                currentSong = null,
+                isPlaying = false,
+                isBuffering = false
+            )
         }
     }
 
@@ -593,18 +553,16 @@ class MusicPlayerManager @Inject constructor(
     }
 
     /**
-     * Builds a lightweight [MediaItem] for a [Song] suitable for System UI media resumption.
-     * Uses only URIs (no bitmap bytes) so it can be called synchronously without I/O.
-     * System UI will fetch artwork from the URI on its own.
+     * Builds a [MediaItem] for a [Song] synchronously.
      */
-    fun buildMediaItemForResumption(song: Song): MediaItem {
+    fun buildMediaItem(song: Song): MediaItem {
         val readableFile = downloadRepository.getReadableFileForSong(song)
         val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(song) else null
 
         val uri = when {
             song.url.isNotEmpty() && (song.url.startsWith("/") || song.url.startsWith("file:")) -> {
                 val filePath = if (song.url.startsWith("file://")) song.url.substring(7) else song.url
-                val customFile = java.io.File(filePath)
+                val customFile = File(filePath)
                 if (customFile.exists() && customFile.canRead()) {
                     if (song.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
                     else song.url
@@ -633,6 +591,8 @@ class MusicPlayerManager @Inject constructor(
             .setArtist(song.primaryArtistNames)
             .setAlbumTitle(song.album.name)
             .setArtworkUri(artworkUri)
+            .setIsPlayable(true)
+            .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
             .build()
 
         return MediaItem.Builder()
@@ -642,108 +602,53 @@ class MusicPlayerManager @Inject constructor(
             .build()
     }
 
+    fun buildMediaItemForResumption(song: Song): MediaItem {
+        return buildMediaItem(song)
+    }
+
+    private fun triggerPreCaching() {
+        cachingJob?.cancel()
+        cachingJob = scope.launch(Dispatchers.IO) {
+            val current = queueManager.currentSong
+            if (current != null) {
+                val readableFile = downloadRepository.getReadableFileForSong(current)
+                val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(current) else null
+                if (readableFile == null && cachedFile == null) {
+                    streamingCacheManager.cacheSong(current)
+                }
+            }
+            val upcoming = queueManager.nextSong
+            if (upcoming != null) {
+                val readableFile = downloadRepository.getReadableFileForSong(upcoming)
+                val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(upcoming) else null
+                if (readableFile == null && cachedFile == null) {
+                    streamingCacheManager.cacheSong(upcoming)
+                }
+            }
+        }
+    }
+
     private fun restoreLastPlayedSong(player: Player) {
-        val lastSong = queueManager.currentSong
-        if (lastSong != null) {
-            Log.d(TAG, "restoreLastPlayedSong: found song '${lastSong.name}' in queue manager, restoring to ExoPlayer")
-            val readableFile = downloadRepository.getReadableFileForSong(lastSong)
-            val cachedFile = if (readableFile == null) streamingCacheManager.getCachedFileForSong(lastSong) else null
-            
-            val uri = when {
-                lastSong.url.isNotEmpty() && (lastSong.url.startsWith("/") || lastSong.url.startsWith("file:")) -> {
-                    val filePath = if (lastSong.url.startsWith("file://")) lastSong.url.substring(7) else lastSong.url
-                    val customFile = java.io.File(filePath)
-                    if (customFile.exists() && customFile.canRead()) {
-                        if (lastSong.url.startsWith("/")) android.net.Uri.fromFile(customFile).toString()
-                        else lastSong.url
-                    } else {
-                        when {
-                            readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
-                            cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
-                            else -> lastSong.highQualityDownloadUrl
-                        }
-                    }
-                }
-                readableFile != null -> android.net.Uri.fromFile(readableFile).toString()
-                cachedFile != null -> android.net.Uri.fromFile(cachedFile).toString()
-                else -> lastSong.highQualityDownloadUrl
-            }
+        val queue = queueManager.queue.value
+        val currentIndex = queueManager.currentIndex.value
+        if (queue.isNotEmpty() && currentIndex in queue.indices) {
+            val lastSong = queue[currentIndex]
+            val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
+            val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
 
-            if (uri != null) {
-                val localArtworkFile = downloadRepository.getCachedArtworkForSong(lastSong)
-                val artworkUri = if (localArtworkFile != null) {
-                    android.net.Uri.fromFile(localArtworkFile)
-                } else {
-                    lastSong.highQualityImageUrl?.let { android.net.Uri.parse(it) }
-                }
+            _playbackState.value = PlaybackState(
+                currentSong = lastSong,
+                isPlaying = false,
+                isBuffering = false,
+                currentPosition = savedPos,
+                duration = 0L
+            )
+            Log.d(TAG, "restoreLastPlayedSong: eagerly set playback state for '${lastSong.name}' at pos=$savedPos")
 
-                val sharedPreferences = context.getSharedPreferences("mymusic_playback_prefs", Context.MODE_PRIVATE)
-                val savedPos = sharedPreferences.getLong("KEY_SEEK_POSITION", 0L)
-
-                // Eagerly update _playbackState BEFORE the artwork coroutine so the mini player
-                // shows up immediately on app start without waiting for artwork to load.
-                _playbackState.value = PlaybackState(
-                    currentSong = lastSong,
-                    isPlaying = false,
-                    isBuffering = false,
-                    currentPosition = savedPos,
-                    duration = 0L
-                )
-                Log.d(TAG, "restoreLastPlayedSong: eagerly set playback state for '${lastSong.name}' at pos=$savedPos")
-
-                scope.launch {
-                    val artworkBitmap = withContext(Dispatchers.IO) {
-                        try {
-                            when {
-                                localArtworkFile != null -> BitmapFactory.decodeFile(localArtworkFile.absolutePath)
-                                lastSong.highQualityImageUrl != null -> {
-                                    val request = ImageRequest.Builder(context)
-                                        .data(lastSong.highQualityImageUrl)
-                                        .allowHardware(false)
-                                        .build()
-                                    (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
-                                }
-                                else -> null
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to load artwork for background restoration: ${e.message}", e)
-                            null
-                        }
-                    }
-
-                    val artworkBytes = artworkBitmap?.let { bitmap ->
-                        try {
-                            ByteArrayOutputStream().use { stream ->
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-                                stream.toByteArray()
-                            }
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }
-
-                    val metadataBuilder = MediaMetadata.Builder()
-                        .setTitle(lastSong.name)
-                        .setArtist(lastSong.primaryArtistNames)
-                        .setAlbumTitle(lastSong.album.name)
-                        .setArtworkUri(artworkUri)
-                    if (artworkBytes != null) {
-                        metadataBuilder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                    }
-
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(uri)
-                        .setMediaMetadata(metadataBuilder.build())
-                        .build()
-
-                    player.setMediaItem(mediaItem)
-                    if (savedPos > 0) {
-                        player.seekTo(savedPos)
-                    }
-                    player.prepare()
-                    Log.d(TAG, "restoreLastPlayedSong: ExoPlayer prepared at pos=$savedPos")
-                }
-            }
+            val mediaItems = queue.map { buildMediaItem(it) }
+            player.setMediaItems(mediaItems, currentIndex, savedPos)
+            player.prepare()
+            Log.d(TAG, "restoreLastPlayedSong: ExoPlayer prepared with ${mediaItems.size} items at index $currentIndex, pos=$savedPos")
         }
     }
 
