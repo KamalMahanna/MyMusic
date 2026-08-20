@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: tenki-standard-medium-4c-8g
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
